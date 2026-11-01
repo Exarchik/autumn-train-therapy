@@ -22,7 +22,7 @@ body.menu-open #c{cursor:default}
 #settings select{font:inherit;color:#e8e4d8;background:#2c2f32;border:1px solid rgba(255,255,255,.14);border-radius:8px;padding:6px 8px;min-width:196px}
 #settings select:focus-visible,#settings button:focus-visible{outline:2px solid #e8c27a;outline-offset:2px}
 #settings .x{width:36px;height:36px;border:0;border-radius:9px;background:rgba(255,255,255,.08);color:#e8e4d8;font-size:20px;line-height:1;cursor:pointer}
-#route{position:fixed;left:16px;bottom:10px;width:calc(100vw - 32px);height:88px;z-index:4;cursor:pointer;-webkit-tap-highlight-color:transparent}#route.compact{height:30px}#route[hidden]{display:none}body.stereo #route{display:none}
+#route{position:fixed;left:16px;bottom:10px;width:calc(100vw - 32px);height:88px;z-index:4;cursor:pointer;-webkit-tap-highlight-color:transparent}#route.compact{height:30px}#route{transition:opacity .6s}#route.faded{opacity:.33}#route[hidden]{display:none}body.stereo #route{display:none}
 #menu button{width:48px;height:48px;border:0;border-radius:9px;background:rgba(255,255,255,.07);color:#e8e4d8;display:grid;place-items:center;cursor:pointer;padding:0;-webkit-tap-highlight-color:transparent}
 #menu button:hover{background:rgba(255,255,255,.14)}
 #menu button[aria-pressed="true"]{background:#c88a3a;color:#1c1a18}
@@ -1115,10 +1115,11 @@ selDay.addEventListener('change',()=>applySet('day',selDay.value));selNight.addE
 mSet.addEventListener('click',e=>{e.stopPropagation();openSettings(true)});document.getElementById('setClose').addEventListener('click',e=>{e.stopPropagation();openSettings(false)});
 setEl.addEventListener('click',e=>{e.stopPropagation();if(e.target===setEl)openSettings(false)});setEl.addEventListener('pointerdown',e=>e.stopPropagation());
 addEventListener('keydown',e=>{if(e.code==='Escape'&&settingsOpen)openSettings(false)});
-function setMap(on){routeCv.hidden=!on;mMap.setAttribute('aria-pressed',on?'true':'false');try{localStorage.setItem('autumnTrain.map',on?'1':'0')}catch(e){}}
+function setMap(on){routeCv.hidden=!on;if(on&&typeof routeWake==='function')routeWake();mMap.setAttribute('aria-pressed',on?'true':'false');try{localStorage.setItem('autumnTrain.map',on?'1':'0')}catch(e){}}
 mMap.addEventListener('click',e=>{e.stopPropagation();setMap(routeCv.hidden);showMenu(true)});
 function setCompact(on){routeCv.classList.toggle('compact',on);try{localStorage.setItem('autumnTrain.mapSmall',on?'1':'0')}catch(e){}}
-routeCv.addEventListener('click',e=>{e.stopPropagation();setCompact(!routeCv.classList.contains('compact'))});routeCv.addEventListener('pointerdown',e=>e.stopPropagation());
+let routeFadeT=null;function routeWake(){routeCv.classList.remove('faded');clearTimeout(routeFadeT);routeFadeT=setTimeout(()=>routeCv.classList.add('faded'),5000)}
+routeCv.addEventListener('click',e=>{e.stopPropagation();if(routeCv.classList.contains('faded')){routeWake();return}setCompact(!routeCv.classList.contains('compact'));routeWake()});routeCv.addEventListener('pointerdown',e=>e.stopPropagation());
 menuEl.addEventListener('pointerdown',e=>e.stopPropagation());
 addEventListener('keydown',e=>{if(e.code==='Escape'&&!menuEl.hidden)showMenu(false)});
 if(MENU_ENABLED){try{if(localStorage.getItem('autumnTrain.stereo')==='1')setStereo(true);if(localStorage.getItem('autumnTrain.lens')==='1')setLens(true);if(localStorage.getItem('autumnTrain.map')==='1')setMap(true);if(localStorage.getItem('autumnTrain.mapSmall')==='1')setCompact(true)}catch(e){}}
