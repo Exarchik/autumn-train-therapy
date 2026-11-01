@@ -13,6 +13,7 @@ body.stereo .vig{display:none}body.stereo .vigL,body.stereo .vigR{display:block}
 body.menu-open #c{cursor:default}
 #menu{position:fixed;left:max(12px,env(safe-area-inset-left));top:50%;transform:translateY(-50%);display:flex;flex-direction:column;gap:8px;padding:8px;background:rgba(20,22,24,.74);border-radius:12px;z-index:5;box-shadow:0 4px 18px rgba(0,0,0,.35)}
 #menu[hidden]{display:none}
+#route{position:fixed;left:16px;bottom:10px;width:calc(100vw - 32px);height:88px;pointer-events:none;z-index:4}#route[hidden]{display:none}body.stereo #route{display:none}
 #menu button{width:48px;height:48px;border:0;border-radius:9px;background:rgba(255,255,255,.07);color:#e8e4d8;display:grid;place-items:center;cursor:pointer;padding:0;-webkit-tap-highlight-color:transparent}
 #menu button:hover{background:rgba(255,255,255,.14)}
 #menu button[aria-pressed="true"]{background:#c88a3a;color:#1c1a18}
@@ -20,7 +21,7 @@ body.menu-open #c{cursor:default}
 </style>
 <canvas id="c" aria-label="Вид з вікна потяга, що їде крізь осінь"></canvas>
 <div class="scan"></div><div class="vig"></div><div class="vigL"></div><div class="vigR"></div>
-<nav id="menu" hidden aria-label="Меню"><button id="mStereo" type="button" aria-label="Стерео-режим" aria-pressed="false" title="Стерео-режим"><svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="6.5" cy="14" r="3.6"/><circle cx="17.5" cy="14" r="3.6"/><path d="M10.1 13.4q1.9-1.6 3.8 0M2.9 13.2 4.6 7.5h2M21.1 13.2 19.4 7.5h-2"/></svg></button><button id="mLens" type="button" aria-label="Корекція лінз VR-окулярів" aria-pressed="false" title="Корекція лінз"><svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M3 7.5Q3 5 5.5 5h13Q21 5 21 7.5v8q0 2.5-2.5 2.5h-3.2l-1.8-2.6q-1.5-1.8-3 0L8.7 18H5.5Q3 18 3 15.5z"/><circle cx="8" cy="11" r="2.3"/><circle cx="16" cy="11" r="2.3"/></svg></button></nav><div id="toast" style="position:fixed;left:16px;top:16px;font:600 13px/1.4 system-ui,sans-serif;color:#e8e4d8;background:rgba(20,22,24,.72);padding:6px 10px;border-radius:4px;pointer-events:none;opacity:0;transition:opacity .4s"></div>
+<nav id="menu" hidden aria-label="Меню"><button id="mStereo" type="button" aria-label="Стерео-режим" aria-pressed="false" title="Стерео-режим"><svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="6.5" cy="14" r="3.6"/><circle cx="17.5" cy="14" r="3.6"/><path d="M10.1 13.4q1.9-1.6 3.8 0M2.9 13.2 4.6 7.5h2M21.1 13.2 19.4 7.5h-2"/></svg></button><button id="mLens" type="button" aria-label="Корекція лінз VR-окулярів" aria-pressed="false" title="Корекція лінз"><svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M3 7.5Q3 5 5.5 5h13Q21 5 21 7.5v8q0 2.5-2.5 2.5h-3.2l-1.8-2.6q-1.5-1.8-3 0L8.7 18H5.5Q3 18 3 15.5z"/><circle cx="8" cy="11" r="2.3"/><circle cx="16" cy="11" r="2.3"/></svg></button><button id="mMap" type="button" aria-label="Схема маршруту" aria-pressed="false" title="Схема маршруту"><svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6l6-2 6 2 6-2v14l-6 2-6-2-6 2z"/><path d="M9 4v14M15 6v14"/></svg></button></nav><canvas id="route" hidden></canvas><div id="toast" style="position:fixed;left:16px;top:16px;font:600 13px/1.4 system-ui,sans-serif;color:#e8e4d8;background:rgba(20,22,24,.72);padding:6px 10px;border-radius:4px;pointer-events:none;opacity:0;transition:opacity .4s"></div>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script>
 (()=>{
@@ -151,11 +152,12 @@ function blendTrees(g,c,pb,biome){const a=DENS[pb]||0,b=DENS[biome]||0;
     const MIXP={forest:{con:.2,bir:.1},birch:{con:.08,bir:.6},cityforest:{con:.18,bir:.15},lake:{con:.3,bir:.15},village:{con:.06,bir:.25}}[pb]||{con:.1,bir:.2},n=Math.round((a-b)*70),v=new THREE.Vector3();
     for(let i=0;i<n;i++){const x=rr(0,26),z=rr(-13,-120);if(rnd()>Math.pow(1-x/26,1.3))continue;if(g.userData.road&&z>-34&&z<-22)continue;v.set(x+g.position.x,1,z);if(boxes.some(bb=>bb.containsPoint(v)))continue;tree(c,x,z,rr(7,14),MIXP)}}}
 const BIOMES={yard:.03,forest:.22,birch:.09,field:.17,lake:.12,city:.12,cityforest:.14,industrial:.08,village:.15,depot:.08,pgt:.08};let noLakeUntil=-1e9,lastLakeAbs=-1e9;
-function pickBiome(not){let r=rnd()*0.999,b='forest';const k=Object.keys(BIOMES).filter(x=>x!==not&&!(x==='yard'&&(typeof nextYardAbs==='undefined'||odo+400<nextYardAbs))&&!(x==='lake'&&odo+420<noLakeUntil)&&!(not==='lake'&&(x==='city'||x==='village'||x==='pgt'))&&!(x==='lake'&&(not==='city'||not==='village'||not==='pgt'))),tot=k.reduce((a,x)=>a+BIOMES[x],0);r*=tot;for(const x of k){r-=BIOMES[x];if(r<=0){b=x;break}}return b}
+function pickBiome(not,at){const pl=at!==undefined;let r=rnd()*0.999,b='forest';const k=Object.keys(BIOMES).filter(x=>x!==not&&!(x==='yard'&&(pl?at<PN.yard:(typeof nextYardAbs==='undefined'||odo+400<nextYardAbs)))&&!(x==='lake'&&(pl?at<Math.max(noLakeUntil,PN.noLake):odo+420<noLakeUntil))&&!(not==='lake'&&(x==='city'||x==='village'||x==='pgt'))&&!(x==='lake'&&(not==='city'||not==='village'||not==='pgt'))),tot=k.reduce((a,x)=>a+BIOMES[x],0);r*=tot;for(const x of k){r-=BIOMES[x];if(r<=0){b=x;break}}return b}
 const TRACK_LAMP=B({color:0x3a3a36}),POOL=new THREE.MeshBasicMaterial({color:0xffc070,transparent:true,opacity:0,blending:THREE.AdditiveBlending,depthWrite:false}),POOL_GEO=new THREE.CircleGeometry(3.2,10).rotateX(-Math.PI/2);
 /* ---------- stations ---------- */
-const STN_ADJ=['Тихі','Старі','Нові','Дальні','Теплі','Малі','Вишневі','Кленові','Сірі','Нижні','Верхні'],STN_N=['Вузли','Верби','Броди','Сади','Луки','Ставки','Хутори','Криниці','Дуби','Липки','Вишні','Яри'];
-const STN_ONE=['Пшеничне','Хрящувате','Гузнівка','Славнобродське','Жупанове','Костянівка','Заплавне','Афінівка','Буряки','Озерівка','Семигорівка','Чепня','Житів','Катеринівка','Щучки','Промислове','Скоричі','Березанка','Туманівка','Підлісне','Заріччя','Вільшанка','Грибниківка','Ключицьке','Стежівське','Південна','Лісова','Кринички','Затишне','Листопадове','Ясенове','Тополі','Журавликівка','Межова'];
+const STN_ADJ=['Тихі','Старі','Нові','Дальні','Теплі','Малі','Сірі','Нижні','Верхні'];
+const STN_N=['Вузли','Верби','Броди','Сади','Луки','Ставки','Хутори','Криниці','Дуби','Липки','Вишні','Яри'];
+const STN_ONE=['Стожарівка','Любимове','Мар\'янівка','Котики','Пшеничне','Хрящувате','Гузнівка','Славнобродське','Жупанове','Костянівка','Заплавне','Афінівка','Буряки','Озерівка','Семигорівка','Чепня','Житів','Катеринівка','Щучки','Промислове','Скоричі','Березанка','Туманівка','Підлісне','Заріччя','Вільшанка','Грибниківка','Ключицьке','Стежівське','Південна','Лісова','Кринички','Затишне','Листопадове','Ясенове','Тополі','Журавликівка','Межова'];
 // kilometre stations show the real distance travelled: a random starting kilometre plus the station's place along the line
 const KM0=rr(12,140)|0;
 const TOWNB=['city','cityforest','village','pgt'];
@@ -323,7 +325,7 @@ function boardUpd(g,q,dt){const P=q.p.position,b=q.brd,dx=b.x-P.x,dz=b.z-P.z,d=M
 let wetPrev=false;
 function rainStarted(){const cand=[];for(const g of chunks){const pp=g.userData.people;if(!pp)continue;for(const q of pp){const wx=g.position.x+q.p.position.x;if(!q.run&&wx>-5&&wx<70)cand.push(q)}}if(cand.length&&chance(.5))pick(cand).fum=rr(3,6)}
 let stType='city';
-function signOn(g,x,y,z,white,w=4.4){for(const px of[x-w*.43,x+w*.43])addBox(g,MAT.metal,px,y-2.3,z-.05,.07,2.6,.07);const sg=new THREE.Mesh(new THREE.PlaneGeometry(w,w*.19),B({map:signTex(g.userData.stName=stationName(g.userData.ax+x,g),white)}));sg.position.set(x,y,z);sg.userData.ownMat=1;g.add(sg)}
+function signOn(g,x,y,z,white,w=4.4){for(const px of[x-w*.43,x+w*.43])addBox(g,MAT.metal,px,y-2.3,z-.05,.07,2.6,.07);const sg=new THREE.Mesh(new THREE.PlaneGeometry(w,w*.19),B({map:signTex(g.userData.stName=stNamePlan||stationName(g.userData.ax+x,g),white)}));sg.position.set(x,y,z);sg.userData.ownMat=1;g.add(sg)}
 function bench(g,x,z,w,PT){const bid=Math.random(),sl=g.userData.slots||(g.userData.slots=[]),n0=sl.length;for(let k=-w/2+.45;k<=w/2-.4;k+=.62)sl.push({x:x+k,z:z+.32,y:PT,used:null,edge:0,b:bid});if(sl.length>n0){sl[n0].edge=-1;if(sl.length-1>n0)sl[sl.length-1].edge=1}}
 const LITS=[],LITC=new Map();function litOf(m){if(!m.isMeshLambertMaterial||m.transparent)return m;let l=LITC.get(m);if(!l){l=m.clone();l.onBeforeCompile=m.onBeforeCompile;if(m.customProgramCacheKey)l.customProgramCacheKey=m.customProgramCacheKey;l.emissive=m.color.clone();l.emissiveIntensity=0;LITC.set(m,l);LITS.push(l)}return l}
 function litPerson(p){p.traverse(o=>{if(o.isMesh&&o.material)o.material=litOf(o.material)})}
@@ -477,7 +479,7 @@ function quad(g,x,z,s,mat,up,patch){const q=new THREE.Group();q.position.set(x,0
   anim(g,()=>{h.position.y=((up?1.0:.32)+Math.sin(T*1.3+x)*.03)*s});return q}
 const ROADM=L({map:tGround,color:0x3a3a3c}),DECKM=L({color:0x2e2c2a}),CARC=[0x6a2a24,0xc8c4b8,0x2a3a5a,0x3a4a2a,0x8a7a3a,0x1e1e20,0x5a5a5e].map(c=>L({color:c})),TAILM=B({color:0xa01a10});
 let odo=0,roads=[],nextCrossAbs=rr(500,1100),bellT=0;const crossList=[];
-function crossing(g){const lx=rr(10,30),ang=chance(.3)?0:-rr(.12,.42);roads.push({ax:g.userData.ax+lx,ang});
+function crossing(g){markAct(g.userData.ax,'crossing');const lx=rr(10,30),ang=chance(.3)?0:-rr(.12,.42);roads.push({ax:g.userData.ax+lx,ang});
   const r=new THREE.Group();r.position.set(lx,0,-3.6);r.rotation.y=ang;r.userData.keep=1;g.add(r);
   addBox(r,DECKM,0,.79,-1.4,7,.045,8);{const P=[[2.4,.76],[-5.4,.76],[-11.2,-.02]],v=[],sl=1.7,t=3.5;const pt=(z,y,sd,top)=>top?[sd*t,y,z]:[sd*(t+(y+.05)*sl),-.06,z];
     for(let i=0;i<P.length-1;i++){const[a,ya]=P[i],[b,yb]=P[i+1];for(const sd of[-1,1]){const A=pt(a,ya,sd,1),B=pt(b,yb,sd,1),C=pt(b,yb,sd,0),D=pt(a,ya,sd,0);v.push(...A,...B,...C,...A,...C,...D)}v.push(...pt(a,ya,-1,1),...pt(a,ya,1,1),...pt(b,yb,1,1),...pt(a,ya,-1,1),...pt(b,yb,1,1),...pt(b,yb,-1,1))}
@@ -716,7 +718,7 @@ function lakeWater(g,near){const xs=[];for(let x=0;x<=CL+.01;x+=2)xs.push(x);con
   g.userData.near=near}
 const ease=k=>k*k*(3-2*k);
 const RAMPM=GL({map:tGround,color:0x6e6a44,side:THREE.DoubleSide});
-function overpass(g){const lx=rr(12,28);roads.push({ax:g.userData.ax+lx,ang:0,w:12});const b=new THREE.Group();b.position.x=lx;b.userData.keep=1;g.add(b);
+function overpass(g){const lx=rr(12,28);markAct(g.userData.ax,'overpass');roads.push({ax:g.userData.ax+lx,ang:0,w:12});const b=new THREE.Group();b.position.x=lx;b.userData.keep=1;g.add(b);
   addBox(b,CONC,0,6.6,-3.5,9.4,1.2,24);for(const sd of[-1,1])addBox(b,CONC,sd*4.55,7.8,-3.5,.18,.9,24);for(const z of[-1.75,-9.2])for(const sd of[-1,1])addBox(b,CONC,sd*3,0,z,1.1,6.6,1.1);
   const L=Math.hypot(46,7.6),rp=new THREE.Mesh(GEO.cbox,ROADM);rp.scale.set(9,1.4,L);rp.position.set(0,3.8,-38.5);rp.rotation.x=-Math.atan2(7.6,46);b.add(rp);addBox(b,ROADM,0,0,-160,9,.05,200);
   for(let z=-18;z>-60;z-=9)addBox(b,MAT.metal,4.3,7.6-(-15.5-z)*.165,z,.14,5,.14);
@@ -730,7 +732,7 @@ function vmean(V,z){if(V.kind!=='river')return[0,0];const k=ease(Math.max(0,Math
 function vprofZ(V,d,z){const[m,w]=vmean(V,z);return vprof(V,d-m,w)}
 function vprof(V,d,dw=0){const a=Math.abs(d),h=V.W/2+dw,B=V.kind==='river'?-9.6:-9.2;if(a<=h)return B;return B*(1-ease(Math.min(1,(a-h)/(60-h))))}
 function roadNear(ax,d){return roads.some(r=>Math.abs(r.ax-ax)<d)}
-function riverCross(g,kind='river'){const W=kind==='river'?rr(10,26):kind==='road'?24:12;valley={kind,W,ph:rr(0,6.3),part:0,biome:g.userData.biome};roads.push({ax:g.userData.ax+60,ang:0,w:126});valleyPart(g)}
+function riverCross(g,kind='river'){markAct(g.userData.ax,kind,{n:3});const W=kind==='river'?rr(10,26):kind==='road'?24:12;valley={kind,W,ph:rr(0,6.3),part:0,biome:g.userData.biome};roads.push({ax:g.userData.ax+60,ang:0,w:126});valleyPart(g)}
 function valleyPart(g){const V=valley,part=V.part,off=part*40-60;g.userData.river=1;g.userData.vpart=1;
   const geo=new THREE.PlaneGeometry(40,520,20,V.kind==='river'?130:26).rotateX(-Math.PI/2).translate(20,0,-266),p=geo.attributes.position;
   for(let i=0;i<p.count;i++){const xp=p.getX(i)+off,zp=p.getZ(i);p.setY(i,vprofZ(V,xp,zp))}geo.computeVertexNormals();
@@ -814,7 +816,11 @@ function crows(g){const n=2+(rnd()*5|0),x0=rr(4,30),bs=[];for(let i=0;i<n;i++){c
   anim(g,dt=>{for(const o of bs){const wx=g.position.x+o.b.position.x;if(!o.f&&speed>4&&wx<28&&wx>-10){o.d-=dt;if(o.d<=0){o.f=1;o.w.forEach(m=>m.visible=true)}}
     if(o.f){o.b.position.x+=o.vx*dt;o.b.position.y+=o.vy*dt;o.b.position.z+=o.vz*dt;o.vy*=Math.pow(.6,dt);o.b.rotation.y=Math.atan2(o.vz,-o.vx);o.w.forEach((m,k)=>m.rotation.x=(k?1:-1)*Math.sin(T*16+o.ph)*.8)}}})}
 function details(g,biome,c,MIX){if(forceTunNow){forceTunNow=false;if(!valley&&!g.userData.sid){tunStart(g);return}}
-  if(stState==='none'&&!stationBuild&&!valley&&!g.userData.sid&&g.userData.ax>nextBridgeAbs&&g.userData.ax-lastLakeAbs>500&&!roadNear(g.userData.ax+60,110)&&!(chunks.length&&chunks[chunks.length-1].userData.road)){if((biome==='field'||biome==='forest'||biome==='birch')&&chance(.3)){const k=bigOrTun(g,biome)||pick(['river','river','road','rail']);if(k==='big'){bigStart(g);return}if(k==='tunnel'){tunStart(g);return}riverCross(g,k);if(k==='river')noLakeUntil=g.userData.ax+680;nextBridgeAbs=g.userData.ax+rr(1500,3200);return}if((biome==='industrial'||biome==='cityforest')&&chance(.2)){riverCross(g,pick(['road','rail']));nextBridgeAbs=g.userData.ax+rr(1500,3200);return}if((biome==='industrial'||biome==='field')&&chance(.25)&&!roadNear(g.userData.ax+20,70)){overpass(g);nextBridgeAbs=g.userData.ax+rr(1200,2600);return}}
+  {const ev=g.userData.pev,ax=g.userData.ax;if(ev&&!ev.started){const ok=stState==='none'&&!stationBuild&&!valley&&!g.userData.sid&&!(chunks.length&&chunks[chunks.length-1].userData.road);
+    if(ev.kind==='crossing'){if(stState==='none'&&!stationBuild&&!g.userData.sid&&!roadNear(ax+20,90)){ev.started=true;crossing(g);nextCrossAbs=ax+900}}
+    else if(ok&&ev.kind==='overpass'&&!roadNear(ax+20,70)){ev.started=true;overpass(g);return}
+    else if(ok&&!roadNear(ax+60,110)){ev.started=true;if(ev.kind==='big'){bigStart(g,ev.n);return}if(ev.kind==='tunnel'){tunStart(g,ev);return}riverCross(g,ev.kind);if(ev.kind==='river')noLakeUntil=ax+680;return}}}
+  if(planOff&&stState==='none'&&!stationBuild&&!valley&&!g.userData.sid&&g.userData.ax>nextBridgeAbs&&g.userData.ax-lastLakeAbs>500&&!roadNear(g.userData.ax+60,110)&&!(chunks.length&&chunks[chunks.length-1].userData.road)){if((biome==='field'||biome==='forest'||biome==='birch')&&chance(.3)){const k=bigOrTun(g,biome)||pick(['river','river','road','rail']);if(k==='big'){bigStart(g);return}if(k==='tunnel'){tunStart(g);return}riverCross(g,k);if(k==='river')noLakeUntil=g.userData.ax+680;nextBridgeAbs=g.userData.ax+rr(1500,3200);return}if((biome==='industrial'||biome==='cityforest')&&chance(.2)){riverCross(g,pick(['road','rail']));nextBridgeAbs=g.userData.ax+rr(1500,3200);return}if((biome==='industrial'||biome==='field')&&chance(.25)&&!roadNear(g.userData.ax+20,70)){overpass(g);nextBridgeAbs=g.userData.ax+rr(1200,2600);return}}
   if(biome!=='city'&&chance(.25)){addBox(g,DM.white,rr(0,CL),-.1,-8.8,.18,1.25,.12);}
   if(biome==='field'){if(chance(.12)){const n=2+(rnd()*4|0),cx=rr(8,32),cz=rr(-28,-60);for(let i=0;i<n;i++)quad(g,cx+rr(-8,8),cz+rr(-6,6),rr(.95,1.1),DM.cow,false,chance(.5)?DM.cowW:null)}
     if(chance(.06))quad(g,rr(5,35),rr(-25,-50),1.25,DM.horse,true);
@@ -827,7 +833,7 @@ function details(g,biome,c,MIX){if(forceTunNow){forceTunNow=false;if(!valley&&!g
     if(chance(.05)){const x=rr(5,35),z=rr(-16,-26);for(const a of[-1,1])for(const b of[-1,1])addBox(g,MAT.wood,x+a,0,z+b,.12,4.5,.12);addBox(g,MAT.wood,x,4.5,z,2.4,1,2.4);addBox(g,MAT.roof,x,5.5,z,2.8,.15,2.8)}
     if(chance(.05)){const x=rr(5,35),z=rr(-18,-30);dacha(g,x,z);addBox(g,MAT.trainWin,x,1.2,z+1.52,.8,.7,.04)}
     if(chance(.04)){const x=rr(4,30);addBox(g,DM.rust,x,.4,-11,12,2.9,2.9);addBox(g,MAT.dark,x-4,0,-11,1,.5,2.6);addBox(g,MAT.dark,x+4,0,-11,1,.5,2.6)}}
-  if((biome==='field'||biome==='forest'||biome==='cityforest'||biome==='village')&&stState==='none'&&!stationBuild&&!g.userData.sid&&g.userData.ax>nextCrossAbs&&!roadNear(g.userData.ax+20,90)&&chance(.35)){crossing(g);nextCrossAbs=g.userData.ax+rr(900,2000)}
+  if(planOff&&(biome==='field'||biome==='forest'||biome==='cityforest'||biome==='village')&&stState==='none'&&!stationBuild&&!g.userData.sid&&g.userData.ax>nextCrossAbs&&!roadNear(g.userData.ax+20,90)&&chance(.35)){crossing(g);nextCrossAbs=g.userData.ax+rr(900,2000)}
   else if(['field','forest','birch','cityforest'].includes(biome)&&!g.userData.sid&&!g.userData.river&&g.userData.ax>nextLepAbs&&!roadNear(g.userData.ax+20,90)&&chance(.3)){powerLine(g);nextLepAbs=g.userData.ax+rr(2500,6000)}
   if(!g.userData.sid&&!g.userData.river&&night<.35&&chance(.06))crows(g);
   if(biome==='lake'){const nr=g.userData.near||(()=>-34);if(chance(.15)){const fx=rr(5,35),fz=nr(fx)+rr(7,8.5);const p=makePerson(g,fx,fz,0,basinY(nr,fx,fz));p.rotation.y=0;const rod=new THREE.Mesh(GEO.box,MAT.dark);rod.scale.set(.03,3.4,.03);rod.position.set(.2,1,0);rod.rotation.x=-.9;p.add(rod)}
@@ -837,10 +843,14 @@ function details(g,biome,c,MIX){if(forceTunNow){forceTunNow=false;if(!valley&&!g
     if(chance(.08)){const x=rr(6,32);for(const a of[-1.2,1.2])addBox(g,MAT.metal,x+a,0,-22,.08,2.2,.08);addBox(g,MAT.metal,x,2.2,-22,2.5,.08,.08);const sw=new THREE.Group();sw.position.set(x,2.2,-22);addBox(sw,MAT.wood,0,-1.6,0,.6,.05,.3);for(const a of[-.25,.25])addBox(sw,MAT.metal,a,-1.6,0,.02,1.6,.02);g.add(sw);anim(g,()=>sw.rotation.z=Math.sin(T*1.2)*.35)}
     if(chance(.05))waterTower(g,rr(5,35),rr(-190,-200))}}
 function makeChunk(x0,biome){{const k=((x0+odo)/1000)%18;bareP=(k<9?1+k:10-(k-9))/100}const ax=x0+odo,pv0=chunks[chunks.length-1];
-  if(!sid&&ax>nextSidingAbs-2200&&stState==='none'&&!stationBuild&&!['lake','village'].includes(biome)&&(ax>nextSidingAbs||(['depot','industrial'].includes(biome)&&ax>nextSidingAbs-2200&&chance(.25)))&&!valley&&!yardPlan&&!(pv0&&(pv0.userData.biome==='lake'||pv0.userData.vil||pv0.userData.station||pv0.userData.river))&&(!roads.length||roads[roads.length-1].ax<ax-30)){sid=sidingPlan(null);if(['depot','industrial'].includes(biome)&&chance(.6)){sid.end='away';sid.startDead=false;sid.depot=true}}
-  if(sid&&(biome==='lake'||biome==='village'))biome='field';if(valley&&(valley.kind==='big'||valley.kind==='tunnel'||['lake','village','city','pgt'].includes(biome)))biome=valley.biome;if(biome==='lake'&&ax<noLakeUntil)biome='field';if(biome==='lake'&&pv0&&(pv0.userData.road||pv0.userData.vil||['city','village','pgt'].includes(pv0.userData.biome)))biome='field';if(['city','village','pgt'].includes(biome)&&pv0&&pv0.userData.biome==='lake')biome='field';if(!yardPlan&&(biome==='yard'||forceYard)&&stState==='none'&&!stationBuild&&!valley&&!sid&&!stShift&&!(pv0&&(pv0.userData.road||pv0.userData.vil||pv0.userData.station||pv0.userData.biome==='lake'||pv0.userData.river))){forceYard=false;yardStart(ax)}if(biome==='yard'||yardPlan)biome='depot';const yardC=!!yardPlan;
+  let PS=null,pev=null;if(!planOff){const kS=slotK(ax);planTo(Math.max(odo+2500,ax+2200));PS=getS(kS);if(PS.b)biome=PS.b==='yard'?'depot':PS.b;pev=PS.ev&&PS.ev.start&&!PS.ev.started?PS.ev:null;
+    if(pev&&pev.kind==='station'){if(stState==='none'&&!sid&&!valley&&!yardPlan&&!stationBuild){pev.started=true;stType=pev.type;stShift=pev.island;stationBuild=stShift?5:3;stState='coming';stationRef=null;forceStandTrain=pev.stand;stNamePlan=pev.name;if(pev.forced)forceShown=true;if(chance(.25)&&!clearDay){fogMulT=pick([.07,.09]);fogMulTimer=70}}else{postpone(PS);pev=null}}
+    else if(pev&&pev.kind==='siding'){if(!sid&&stState==='none'&&!stationBuild&&!valley&&!yardPlan){pev.started=true;sid=pev.p;markAct(ax,'siding')}else{postpone(PS);pev=null}}
+    else if(pev&&pev.kind==='yard'){if(!yardPlan&&stState==='none'&&!stationBuild&&!valley&&!sid&&!stShift){pev.started=true;yardStart(ax,pev.n);markAct(ax,'yard',{n:pev.n})}else{postpone(PS);pev=null}}}
+  if(planOff&&!sid&&ax>nextSidingAbs-2200&&stState==='none'&&!stationBuild&&!['lake','village'].includes(biome)&&(ax>nextSidingAbs||(['depot','industrial'].includes(biome)&&ax>nextSidingAbs-2200&&chance(.25)))&&!valley&&!yardPlan&&!(pv0&&(pv0.userData.biome==='lake'||pv0.userData.vil||pv0.userData.station||pv0.userData.river))&&(!roads.length||roads[roads.length-1].ax<ax-30)){sid=sidingPlan(null);if(['depot','industrial'].includes(biome)&&chance(.6)){sid.end='away';sid.startDead=false;sid.depot=true}}
+  if(sid&&(biome==='lake'||biome==='village'))biome='field';if(valley&&(valley.kind==='big'||valley.kind==='tunnel'||['lake','village','city','pgt'].includes(biome)))biome=valley.biome;if(biome==='lake'&&ax<noLakeUntil)biome='field';if(biome==='lake'&&pv0&&(pv0.userData.road||pv0.userData.vil||['city','village','pgt'].includes(pv0.userData.biome)))biome='field';if(['city','village','pgt'].includes(biome)&&pv0&&pv0.userData.biome==='lake')biome='field';if(planOff&&!yardPlan&&(biome==='yard'||forceYard)&&stState==='none'&&!stationBuild&&!valley&&!sid&&!stShift&&!(pv0&&(pv0.userData.road||pv0.userData.vil||pv0.userData.station||pv0.userData.biome==='lake'||pv0.userData.river))){forceYard=false;yardStart(ax)}if(biome==='yard'||yardPlan)biome='depot';const yardC=!!yardPlan;
   if(!yardC&&forceTun&&stState==='none'&&!stationBuild&&!valley&&!sid&&!(pv0&&pv0.userData.road)){biome='forest';forceTun=false;forceTunNow=true}deadNow=ax<deadUntil&&['forest','birch','cityforest'].includes(biome);if(!deadNow&&['forest','birch'].includes(biome)&&ax>nextDeadAbs&&!valley&&chance(.08)){deadUntil=ax+rr(40,100);nextDeadAbs=ax+rr(15000,30000);deadNow=true}if(deadNow)bareP=.93;
-  const g=new THREE.Group();g.position.x=x0;g.userData.biome=biome;g.userData.ax=ax;if(sid){g.userData.sid=1;if(!sid.g0)sid.g0=g}
+  const g=new THREE.Group();g.position.x=x0;g.userData.biome=biome;g.userData.ax=ax;g.userData.pev=pev&&['river','road','rail','big','tunnel','overpass','crossing'].includes(pev.kind)?pev:null;g.userData.PS=PS;if(sid){g.userData.sid=1;if(!sid.g0)sid.g0=g}
   const c={tr:[],bt:[],bl:[],co:[],sp:[]};let gr;{const pb=pv0&&pv0.userData.biome;if(pb&&pb!==biome&&MAT.ground[pb]){const geo=GEO.ground.clone(),p=geo.attributes.position,col=[],A=MAT.ground[pb].color,B2=MAT.ground[biome].color,C=new THREE.Color();
     for(let i=0;i<p.count;i++){const k=ease(Math.min(1,Math.max(0,(p.getX(i)-0)/40)));C.copy(A).lerp(B2,k);col.push(C.r,C.g,C.b)}geo.setAttribute('color',new THREE.Float32BufferAttribute(col,3));gr=new THREE.Mesh(geo,GROUNDV);g.userData.fromB=pb}
    else gr=new THREE.Mesh(GEO.ground,MAT.ground[biome]);gr.userData.keep=1;gr.userData.ground=1;g.add(gr)}
@@ -851,7 +861,7 @@ function makeChunk(x0,biome){{const k=((x0+odo)/1000)%18;bareP=(k<9?1+k:10-(k-9)
   const MIX={forest:{con:.2,bir:.1},birch:{con:.08,bir:.6},field:{con:.1,bir:.2},lake:{con:.3,bir:.15},city:{con:.05,bir:.3},cityforest:{con:.18,bir:.15},industrial:{con:.1,bir:.35},village:{con:.06,bir:.25},depot:{con:.05,bir:.5},pgt:{con:.06,bir:.3}}[biome];
   const pv=chunks[chunks.length-1];
   let st=false,shIdx=-1;if(stationBuild>0){const idx=(stShift?5:3)-stationBuild;if(stShift)shIdx=idx;stationBuild--;const bi=stShift?(idx===2?1:-9):idx;st=bi>=0&&buildStation(g,c,MIX,bi,stType)!==false;if(st)g.userData.station=1}
-  if(shIdx>=0){g.userData.sid=1;shiftTrack(g,c,shIdx,st);if(shIdx===4)stShift=false}
+  if(shIdx>=0){g.userData.sid=1;shiftTrack(g,c,shIdx,st);if(shIdx===4)stShift=false}if(!stationBuild&&!stShift)stNamePlan=null;
   if(st){}
   else if(yardC)yardChunk(g,c);
   else if(biome==='forest'||biome==='birch'){for(let i=0;i<34;i++)tree(c,rr(0,CL),rr(-9,-40),rr(7,15),MIX);for(let i=0;i<14;i++)tree(c,rr(0,CL),rr(-40,-70),rr(8,16),MIX);for(let i=0;i<70;i++)sprite(c,rr(0,CL),rr(-68,-135),rr(9,16),MIX);treeline(c,-130,-215,35,MIX)}
@@ -890,6 +900,7 @@ function makeChunk(x0,biome){{const k=((x0+odo)/1000)%18;bareP=(k<9?1+k:10-(k-9)
     if(g.userData.people)g.userData.people=g.userData.people.filter(q=>q.p.parent===g||q.p.parent&&q.p.parent.parent===g)}
   if(c.sp.length){if(g.userData.noTree)c.sp=c.sp.filter(t=>!g.userData.noTree.some(r=>t[0]>r[0]-1.5&&t[0]<r[1]+1.5&&t[2]>r[2]-1.5&&t[2]<r[3]+1.5));if(g.userData.near)c.sp=c.sp.filter(t=>t[2]>g.userData.near(t[0])+8||t[2]<-242);for(let k=0;k<4;k++){const pt=spritePoints(c.sp,k);if(pt)g.add(pt)}}
   [inst(GEO.trunk,MAT.bark,c.tr),inst(GEO.trunk,MAT.birch,c.bt),inst(GEO.blob,MAT.leaf,c.bl,true),inst(GEO.cone,MAT.leaf,c.co,true)].forEach(m=>m&&g.add(m));
+  if(PS){if(PS.ev&&g.userData.pev===PS.ev&&!PS.ev.started)postpone(PS);PS.done=true;PS.b=g.userData.yard||yardC?'yard':g.userData.biome;if(g.userData.station&&g.userData.stName)PS.act={kind:'station',name:g.userData.stName,island:!!(stShift||g.userData.stz)}}
   deadNow=false;world.add(g);chunks.push(g);return g}
 let stShift=false,shiftG=[];const BALM2=L({map:tBal,color:0x8a8478,side:THREE.DoubleSide});
 const sstep=k=>{k=Math.max(0,Math.min(1,k));return k*k*k*(k*(k*6-15)+10)};
@@ -909,7 +920,7 @@ const TRUSSM=L({color:0x7c8488}),PYLM=L({color:0xa49a78}),CABLEM=new THREE.LineB
 let forceTun=false,forceTunNow=false,tunnels=[],tun=0,nextBigAbs=rr(2500,5000),nextTunAbs=rr(1200,3000);
 function bigOrTun(g,b){const ax=g.userData.ax;if(ax>nextBigAbs&&chance(.4))return'big';if(b!=='field'&&ax>nextTunAbs&&chance(.5))return'tunnel';return null}
 function bigY(V,d,z){let k=Math.min(d,V.n*40-d);if(z!==undefined&&z<-14){const r=ease(Math.min(1,(-z-14)/30)),f=d<V.n*20?V.ph:V.ph+2.7;k+=r*(Math.sin(z*.021+f)*13+Math.sin(z*.057+f*1.9)*5.5+Math.sin(z*.19+f*.7)*2+Math.sin(z*.41+f)*.9)}return -19*ease(Math.max(0,Math.min(1,k/120)))}
-function bigStart(g){const n=10+(rnd()*11|0);const py=(n>=15?[n/3,2*n/3]:[n/2]).map(k=>Math.round(k)*40);valley={kind:'big',n,py,ph:rr(0,6.3),top:chance(.5)?'truss':'cable',part:0,biome:g.userData.biome};roads.push({ax:g.userData.ax+n*20,ang:0,w:n*40+20});noLakeUntil=g.userData.ax+n*40+400;nextBigAbs=g.userData.ax+rr(7000,14000);nextBridgeAbs=g.userData.ax+n*40+rr(1200,2400);bigPart(g)}
+function bigStart(g,nn){const n=nn||10+(rnd()*11|0);markAct(g.userData.ax,'big',{n});const py=(n>=15?[n/3,2*n/3]:[n/2]).map(k=>Math.round(k)*40);valley={kind:'big',n,py,ph:rr(0,6.3),top:chance(.5)?'truss':'cable',part:0,biome:g.userData.biome};roads.push({ax:g.userData.ax+n*20,ang:0,w:n*40+20});noLakeUntil=g.userData.ax+n*40+400;nextBigAbs=g.userData.ax+rr(7000,14000);nextBridgeAbs=g.userData.ax+n*40+rr(1200,2400);bigPart(g)}
 function bigPart(g){const V=valley,part=V.part,d0=part*40,last=part===V.n-1;g.userData.river=1;g.userData.vpart=1;
   const geo=new THREE.PlaneGeometry(40,520,20,104).rotateX(-Math.PI/2).translate(20,0,-266),p=geo.attributes.position;
   for(let i=0;i<p.count;i++)p.setY(i,bigY(V,d0+p.getX(i),p.getZ(i)));geo.computeVertexNormals();
@@ -955,7 +966,7 @@ function bigPart(g){const V=valley,part=V.part,d0=part*40,last=part===V.n-1;g.us
   if(chance(.14)){const n=1+(chance(.3)?1:0);for(let k=0;k<n;k++){const st=chance(.45);const pp=makePerson(g,rr(4,36),-8.3+k*.5,st?0:pick([-1,1])*rr(.6,1),.86);if(st){pp.rotation.y=Math.PI;if(chance(.4)){const rod=new THREE.Mesh(GEO.box,MAT.dark);rod.scale.set(.03,3.4,.03);rod.position.set(.2,1,0);rod.rotation.x=-.9;pp.add(rod)}}}}
   V.part++;if(V.part>=V.n)valley=null}
 // ---- tunnel through a hill ----
-function tunStart(g){const p0=rr(20,30),L=rr(100,150),n=Math.ceil((p0+L+22)/40);valley={kind:'tunnel',p0,L,n,Hm:rr(15,21),part:0,biome:g.userData.biome};tunnels.push({a0:g.userData.ax+p0,a1:g.userData.ax+p0+L});nextTunAbs=g.userData.ax+rr(5000,10000);nextBridgeAbs=g.userData.ax+n*40+rr(600,1400);tunPart(g)}
+function tunStart(g,o){const p0=o?o.p0:rr(20,30),L=o?o.L:rr(100,150),n=Math.ceil((p0+L+22)/40);markAct(g.userData.ax,'tunnel',{n});valley={kind:'tunnel',p0,L,n,Hm:rr(15,21),part:0,biome:g.userData.biome};tunnels.push({a0:g.userData.ax+p0,a1:g.userData.ax+p0+L});nextTunAbs=g.userData.ax+rr(5000,10000);nextBridgeAbs=g.userData.ax+n*40+rr(600,1400);tunPart(g)}
 function tunH(V,d){const e=V.n*40,a=V.p0,b=V.p0+V.L;if(d<a)return V.Hm*ease(Math.max(0,d/a));if(d>b)return V.Hm*ease(Math.max(0,Math.min(1,(e-d)/(e-b))));return V.Hm}
 function tunY(V,d,z){const h=tunH(V,d);if(z>-14)return h;if(z<-82)return 0;const k=ease((z+82)/68);return h*k+Math.sin(d*.09+z*.13)*h*.18*k*(1-k)*4}
 function tunPart(g){const V=valley,part=V.part,d0=part*40,a=V.p0-d0,b=V.p0+V.L-d0;g.userData.river=1;g.userData.vpart=1;
@@ -993,7 +1004,7 @@ let NZB=null;function clackEcho(v){if(!ac)return;const t0=ac.currentTime,t=t0+.7
 // ---- train yard: many parallel tracks joined by ladders; our train may switch over and back ----
 let yardPlan=null,yards=[],forceYard=false,nextYardAbs=rr(3000,6000),yardZS=0,yardPhi=0,yardSlow=false,yardRelax=0,yardPrev=0;
 const YBAL=GL({map:tBal,color:0x8a8478,side:THREE.DoubleSide});
-function yardStart(ax){const n=13+(rnd()*5|0),L=n*40,np=1+(rnd()*4|0),no=1+(rnd()*4|0),k=1+(rnd()*np|0),B0=rr(14,24),Ls=32,E0=L-B0,zp=j=>4.5*j,zo=j=>ZL(j);
+function yardStart(ax,nn){const n=nn||13+(rnd()*5|0),L=n*40,np=1+(rnd()*4|0),no=1+(rnd()*4|0),k=1+(rnd()*np|0),B0=rr(14,24),Ls=32,E0=L-B0,zp=j=>4.5*j,zo=j=>ZL(j);
   const Y={a0:ax,a1:ax+L,n,i:0,L,np,no,k,B0,Ls,E0,segs:[],wag:[],sh:[],th:[]};const S=(x0,z0,x1,z1)=>Y.segs.push([x0,z0,x1,z1]);
   S(0,0,L,0);S(B0,0,B0+np*Ls,zp(np));S(E0-np*Ls,zp(np),E0,0);for(let j=1;j<=np;j++)S(B0+j*Ls,zp(j),E0-j*Ls,zp(j));
   const ob=B0+12,oe=E0-12;S(ob,zo(0),ob+no*Ls,zo(no));S(oe-no*Ls,zo(no),oe,zo(0));for(let j=1;j<=no;j++)S(ob+j*Ls,zo(j),oe-j*Ls,zo(j));
@@ -1040,7 +1051,7 @@ function yardChunk(g,c){const Y=yardPlan,i=Y.i,d0=i*40,G=new THREE.Group();G.use
   if(chance(.5)){const shz=new Set(Y.sh.map(t=>t.z)),here=Y.wag.filter(w=>w.x>=d0&&w.x<d0+CL&&!shz.has(w.z));if(here.length){const w=pick(here),row=Y.wag.filter(v=>v.z===w.z&&Math.abs(v.x-w.x)<80);let xa=w.x,xb=w.x;for(const v of row.sort((a,b)=>a.x-b.x)){if(v.x<w.x&&v.x>xa-15.5)xa=v.x}for(const v of row.sort((a,b)=>b.x-a.x)){if(v.x>w.x&&v.x<xb+15.5)xb=v.x}
     xa=Math.min(xa,w.x);xb=Math.max(xb,w.x);const sd=w.z>0?-1:pick([-1,1]),z=w.z+sd*2.25,smoke=chance(.3);makeWorker(g,w.x-d0+rr(-4,4),z,.72,{xa:xa-d0-6,xb:xb-d0+6,face:sd>0?0:Math.PI,hammer:!smoke,smoke});if(chance(.25))makeWorker(g,w.x-d0+rr(-6,6),z+(sd>0?.5:-.5),.72,{xa:xa-d0-6,xb:xb-d0+6,face:sd>0?0:Math.PI,smoke:true})}}
   yardBack(g,c,Y.th[i],Math.min(fo0(eo),zf));
-  Y.i++;if(Y.i>=Y.n){yardPlan=null;biome=pickBiome('yard');biomeT=rr(18,42)}}
+  Y.i++;if(Y.i>=Y.n){yardPlan=null;if(planOff){biome=pickBiome('yard');biomeT=rr(18,42)}}}
 const COOLM=(()=>{const t=ctex(64,128,g=>{g.fillStyle='#8f8d86';g.fillRect(0,0,64,128);for(let i=0;i<900;i++){g.fillStyle=pick(['#9a978f','#85837c','#949189','#7c7a73']);g.fillRect(rnd()*64|0,rnd()*128|0,1,2)}
   for(let i=0;i<26;i++){const x=rnd()*64|0;g.fillStyle='rgba(60,58,52,'+rr(.06,.16)+')';g.fillRect(x,rr(0,40)|0,1+(rnd()*2|0),rr(30,110)|0)}
   g.fillStyle='rgba(225,225,215,.35)';g.fillRect(0,96,64,6);for(let x=0;x<64;x+=2){g.fillStyle='rgba(230,230,220,'+rr(.1,.4)+')';g.fillRect(x,96,2,rr(4,14)|0)}g.fillStyle='#5c5a54';g.fillRect(0,0,64,2)});t.wrapS=THREE.RepeatWrapping;t.repeat.set(3,1);return L({map:t,side:THREE.DoubleSide})})();
@@ -1074,15 +1085,95 @@ function drawView(){if(!stereo){renderer.render(scene,camera);return}if(lens){dr
   camR.copy(camera);camR.translateX(STEREO_SIDE*STEREO_EYE);camR.updateMatrixWorld();renderer.setViewport(w,0,VS.x-w,h);renderer.setScissor(w,0,VS.x-w,h);renderer.render(scene,camR);
   renderer.setScissorTest(false);renderer.setViewport(0,0,VS.x,h)}
 // side menu: one click / tap shows it, a second one hides it
-const menuEl=document.getElementById('menu'),mStereo=document.getElementById('mStereo'),mLens=document.getElementById('mLens');let menuHideT=null;
+const menuEl=document.getElementById('menu'),mStereo=document.getElementById('mStereo'),mLens=document.getElementById('mLens'),mMap=document.getElementById('mMap'),routeCv=document.getElementById('route');let menuHideT=null;
 function setLens(on){lens=on;document.body.classList.toggle('lens',on);mLens.setAttribute('aria-pressed',on?'true':'false');if(on&&!stereo)setStereo(true);else resize();try{localStorage.setItem('autumnTrain.lens',on?'1':'0')}catch(e){}}
 function setStereo(on){stereo=on;if(!on&&lens){lens=false;mLens.setAttribute('aria-pressed','false');document.body.classList.remove('lens');try{localStorage.setItem('autumnTrain.lens','0')}catch(e){}}document.body.classList.toggle('stereo',on);mStereo.setAttribute('aria-pressed',on?'true':'false');resize();try{localStorage.setItem('autumnTrain.stereo',on?'1':'0')}catch(e){}}
 function showMenu(on){if(!MENU_ENABLED)on=false;menuEl.hidden=!on;document.body.classList.toggle('menu-open',on);clearTimeout(menuHideT);if(on)menuHideT=setTimeout(()=>showMenu(false),6000)}
 mStereo.addEventListener('click',e=>{e.stopPropagation();setStereo(!stereo);showMenu(true)});
 mLens.addEventListener('click',e=>{e.stopPropagation();setLens(!lens);showMenu(true)});
+function setMap(on){routeCv.hidden=!on;mMap.setAttribute('aria-pressed',on?'true':'false');try{localStorage.setItem('autumnTrain.map',on?'1':'0')}catch(e){}}
+mMap.addEventListener('click',e=>{e.stopPropagation();setMap(routeCv.hidden);showMenu(true)});
 menuEl.addEventListener('pointerdown',e=>e.stopPropagation());
 addEventListener('keydown',e=>{if(e.code==='Escape'&&!menuEl.hidden)showMenu(false)});
-if(MENU_ENABLED){try{if(localStorage.getItem('autumnTrain.stereo')==='1')setStereo(true);if(localStorage.getItem('autumnTrain.lens')==='1')setLens(true)}catch(e){}}
+if(MENU_ENABLED){try{if(localStorage.getItem('autumnTrain.stereo')==='1')setStereo(true);if(localStorage.getItem('autumnTrain.lens')==='1')setLens(true);if(localStorage.getItem('autumnTrain.map')==='1')setMap(true)}catch(e){}}
+// ---------- route plan: what lies ahead, slot by slot (one slot = one 40 m chunk) ----------
+let planOff=false,plK0=null,plTop=-1,pB=null,pRun=0,stNamePlan=null;const PL=new Map();
+const PN={station:nextStationAbs,bridge:nextBridgeAbs,big:nextBigAbs,tun:nextTunAbs,cross:nextCrossAbs,siding:nextSidingAbs,yard:nextYardAbs,noLake:-1e9};
+const slotK=ax=>{if(plK0===null)plK0=ax;return Math.round((ax-plK0)/CL)},slotAx=k=>plK0+k*CL;
+function getS(k){let S=PL.get(k);if(!S){S={k,ax:slotAx(k),b:null,ev:null,busy:null,done:false,act:null};PL.set(k,S)}return S}
+function stationNamePlan(ax,b){const near=TOWNB.includes(b);const r=near?.25+rnd()*.75:rnd();return r<.25?(KM0+Math.floor(ax/1000))+' км':r<.6?pick(STN_ADJ)+' '+pick(STN_N):pick(STN_ONE)}
+function slotFree(k,n){for(let i=k;i<k+n;i++){const T=PL.get(i);if(T&&(T.busy||T.ev||T.done))return false}return true}
+function evLen(e){return e.n||1}
+function clearEv(e){if(!e)return;for(const [,T] of PL){if(T.busy===e)T.busy=null;if(T.ev===e)T.ev=null}}
+function placeEv(k,e){const n=evLen(e);for(let i=k;i<k+n;i++){const T=getS(i);T.busy=e;if(e.b)T.b=e.b;else if(i>k&&e.kind!=='station'&&e.kind!=='siding'&&e.kind!=='crossing'&&e.kind!=='overpass')T.b=getS(k).b}getS(k).ev=e;e.k=k;
+  if(e.kind==='station'||e.kind==='yard'||e.kind==='siding')for(let i=k+n;i<k+n+2;i++){const T=getS(i);if(!T.busy&&!T.ev)T.quiet=1}}
+function makeEv(kind,o,k){const S=getS(k),ax=S.ax;let e={kind,start:true,forced:!!o.forced};
+  if(kind==='station'){let b=S.b;if(!b||['lake','industrial','depot','yard'].includes(b))b=pick(['city','cityforest','field','forest','village']);e.b=b;
+    let type=b==='city'?pick(['city','city','big']):b==='cityforest'||b==='pgt'?pick(['city','halt']):pick(['halt','rural']);let island=o.island!==undefined?o.island:((type==='halt'||type==='city')&&chance(.3));if(island&&type!=='halt'&&type!=='city')type=b==='city'?'city':'halt';
+    Object.assign(e,{type,island,stand:o.stand!==undefined?o.stand:(island&&chance(.35)),name:stationNamePlan(ax,b),n:island?5:3})}
+  else if(kind==='tunnel'){const p0=rr(20,30),L=rr(100,150);Object.assign(e,{p0,L,n:Math.ceil((p0+L+22)/40),b:['forest','birch'].includes(S.b)?S.b:'forest'})}
+  else if(kind==='big')e.n=10+(rnd()*11|0);
+  else if(kind==='river'||kind==='road'||kind==='rail')e.n=3;
+  else if(kind==='yard'){e.n=13+(rnd()*5|0);e.b='yard'}
+  else if(kind==='siding'){const sp=sidingPlan(null);if(['depot','industrial'].includes(S.b)&&chance(.6)){sp.end='away';sp.startDead=false;sp.depot=true}e.p=sp;e.n=sp.n}
+  return e}
+function planSlot(k){const S=getS(k),ax=S.ax;
+  if(!S.b){if(pRun<=0||!pB){let b=pickBiome(pB,ax);if(b==='yard'){if(slotFree(k,18)){const e=makeEv('yard',{},k);placeEv(k,e);PN.yard=ax+e.n*CL+rr(8000,16000);pB=null;pRun=0;return}b=pickBiome('yard',ax)}pB=b;pRun=Math.round(rr(450,1050)/CL)}
+    S.b=pB;pRun--;if(S.b==='lake'&&ax<Math.max(PN.noLake,noLakeUntil))S.b='field'}
+  if(S.busy||S.ev||S.quiet)return;
+  const prevB=i=>{const T=PL.get(i);return T?T.b:null},b=S.b;
+  const near=(a,c,f)=>{for(let i=k+a;i<=k+c;i++){const T=PL.get(i);if(T&&f(T))return true}return false};
+  if(ax>=PN.station&&slotFree(k,7)){const e=makeEv('station',{},k);placeEv(k,e);PN.station=ax+e.n*CL+rr(4000,9000);return}
+  if(ax>PN.bridge&&!near(-13,0,T=>T.b==='lake')&&!['city','pgt','village'].includes(prevB(k-1))&&!near(-3,3,T=>T.ev&&(T.ev.kind==='crossing'||T.ev.kind==='overpass'))){
+    let kind=null;if(['field','forest','birch'].includes(b)&&chance(.3)){kind=ax>PN.big&&chance(.4)?'big':(b!=='field'&&ax>PN.tun&&chance(.5))?'tunnel':pick(['river','river','road','rail'])}
+    else if(['industrial','cityforest'].includes(b)&&chance(.2))kind=pick(['road','rail']);
+    else if(['industrial','field'].includes(b)&&chance(.25))kind='overpass';
+    if(kind){const e=makeEv(kind,{},k);if(slotFree(k,evLen(e)+1)){placeEv(k,e);
+      if(kind==='big'){PN.big=ax+rr(7000,14000);PN.bridge=ax+e.n*CL+rr(1200,2400);PN.noLake=ax+e.n*CL+400}else if(kind==='tunnel'){PN.tun=ax+rr(5000,10000);PN.bridge=ax+e.n*CL+rr(600,1400)}
+      else if(kind==='overpass')PN.bridge=ax+rr(1200,2600);else{PN.bridge=ax+rr(1500,3200);if(kind==='river')PN.noLake=ax+680}return}}}
+  if(['field','forest','cityforest','village'].includes(b)&&ax>PN.cross&&!near(-3,3,T=>T.busy&&T.busy.kind!=='crossing')&&chance(.35)){placeEv(k,makeEv('crossing',{},k));PN.cross=ax+rr(900,2000);return}
+  if(ax>PN.siding-2200&&!['lake','village'].includes(b)&&(ax>PN.siding||(['depot','industrial'].includes(b)&&chance(.25)))&&!['lake','village'].includes(prevB(k-1))&&!near(-1,-1,T=>T.busy)){const e=makeEv('siding',{},k);if(slotFree(k,e.n+1)){placeEv(k,e);PN.siding=ax+e.n*CL+rr(2500,6000)}}}
+function planTo(axMax){if(plK0===null)return;while(slotAx(plTop+1)<=axMax)planSlot(++plTop);const lo=slotK(odo-2700);for(const k of PL.keys())if(k<lo)PL.delete(k)}
+function postpone(S){const e=S.ev;if(!e)return;clearEv(e);e.tries=(e.tries||0)+1;if(e.tries>8)return;const k=S.k+1;if(slotFree(k,evLen(e)))placeEv(k,e)}
+function insertEvent(kind,o){const kf=slotK(chunks[chunks.length-1].userData.ax)+1;planTo(odo+2500);let k=kf;while(true){const T=PL.get(k);if(T&&((T.busy&&(T.busy.started||T.busy.forced))||(T.ev&&T.ev.forced))){k++;continue}const T2=PL.get(k-1);if(T2&&T2.busy&&T2.busy.forced&&T2.busy.kind!=='crossing'){k++;continue}break}
+  const e=makeEv(kind,Object.assign({forced:true},o||{}),k),n=evLen(e);for(let i=k-1;i<k+n+2;i++){const T=PL.get(i);if(!T)continue;for(const x of[T.ev,T.busy])if(x&&!x.started&&!x.forced)clearEv(x);T.quiet=0}placeEv(k,e);if(kind==='tunnel')for(const i of[k-2,k-1,k+n,k+n+1]){const T=PL.get(i);if(T&&!T.done&&!T.busy&&['lake','city','village','pgt','field'].includes(T.b))T.b=e.b}return k}
+function markAct(ax,kind,extra){if(plK0===null)return;const S=getS(slotK(ax));S.act=Object.assign({kind},extra||{})}
+// ---------- route strip: 2 km behind, 2 km ahead ----------
+const BCOL={forest:'#2f5a34',birch:'#93a052',field:'#b0903c',lake:'#3f7090',city:'#7b8691',cityforest:'#4f7268',industrial:'#7a6a5a',village:'#c2744a',depot:'#8a5a3a',pgt:'#8a7a9a',yard:'#4c4c52'};
+const BNAME={forest:'ліс',birch:'гай',field:'поле',lake:'озеро',city:'місто',cityforest:'передмістя',industrial:'промзона',village:'село',depot:'депо',pgt:'ПГТ',yard:'стоянка'};
+let routeT=0;
+function routeDraw(){if(!routeCv||routeCv.hidden||plK0===null)return;const dpr=Math.min(2,devicePixelRatio||1),W=routeCv.clientWidth,H=routeCv.clientHeight;if(!W)return;
+  if(routeCv.width!==Math.round(W*dpr)||routeCv.height!==Math.round(H*dpr)){routeCv.width=Math.round(W*dpr);routeCv.height=Math.round(H*dpr)}
+  const c=routeCv.getContext('2d');c.setTransform(dpr,0,0,dpr,0,0);c.clearRect(0,0,W,H);
+  const gr=c.createLinearGradient(0,0,0,H);gr.addColorStop(0,'rgba(16,18,20,0)');gr.addColorStop(.35,'rgba(16,18,20,.72)');gr.addColorStop(1,'rgba(16,18,20,.82)');c.fillStyle=gr;c.beginPath();c.roundRect?c.roundRect(0,0,W,H,10):c.rect(0,0,W,H);c.fill();
+  const m=16,BY=52,BH=14,X=ax=>m+(W-2*m)*((ax-odo)/4000+.5),lo=odo-2040,hi=odo+2040;
+  const sl=[...PL.values()].filter(S=>S.ax+CL>lo&&S.ax<hi&&S.b).sort((a,b)=>a.k-b.k);
+  c.save();c.beginPath();c.rect(m,0,W-2*m,H);c.clip();
+  let run=null;const runs=[];for(const S of sl){if(run&&run.b===S.b&&run.k1===S.k-1){run.k1=S.k;run.x1=X(S.ax+CL)}else{run={b:S.b,k1:S.k,x0:X(S.ax),x1:X(S.ax+CL)};runs.push(run)}}
+  for(const r of runs){c.fillStyle=BCOL[r.b]||'#555';c.fillRect(r.x0,BY,r.x1-r.x0+.6,BH)}
+  c.fillStyle='rgba(0,0,0,.45)';for(const r of runs)c.fillRect(r.x1-.5,BY,1,BH);
+  c.font='600 10.5px system-ui,sans-serif';c.textBaseline='middle';for(const r of runs){const w=r.x1-r.x0;const t=BNAME[r.b]||'';if(w>c.measureText(t).width+12){c.fillStyle='rgba(255,255,255,.88)';c.fillText(t,Math.max(r.x0,m)+5,BY+BH/2+.5)}}
+  // events
+  const IC='#e8e4d8';c.strokeStyle=IC;c.fillStyle=IC;c.lineCap='round';c.lineJoin='round';
+  const icon=(k,x,y)=>{c.save();c.translate(x,y);c.lineWidth=1.8;c.strokeStyle=IC;c.fillStyle=IC;c.beginPath();
+    if(k==='station'||k==='island'){c.fillRect(-7,2,14,3);c.fillRect(-6,-5,12,2);c.fillRect(-5,-3,1.6,5);c.fillRect(3.4,-3,1.6,5);if(k==='island'){c.fillStyle='#f0c860';c.beginPath();c.arc(0,-1,1.8,0,7);c.fill()}}
+    else if(k==='crossing'){c.moveTo(-5,-5);c.lineTo(5,5);c.moveTo(5,-5);c.lineTo(-5,5);c.stroke()}
+    else if(k==='river'||k==='road'||k==='rail'){c.fillRect(-8,-4,16,2.4);c.moveTo(-6,5);c.quadraticCurveTo(0,-4,6,5);c.stroke()}
+    else if(k==='big'){c.fillRect(-9,-1,18,2.4);c.moveTo(-8,6);c.quadraticCurveTo(-4,0,0,6);c.moveTo(0,6);c.quadraticCurveTo(4,0,8,6);c.stroke();c.beginPath();c.moveTo(0,-1);c.lineTo(0,-8);c.stroke()}
+    else if(k==='tunnel'){c.moveTo(-9,6);c.lineTo(-3,-5);c.lineTo(0,-2);c.lineTo(3,-6);c.lineTo(9,6);c.closePath();c.fill();c.fillStyle='#151515';c.beginPath();c.moveTo(-2.6,6);c.lineTo(-2.6,2.5);c.arc(0,2.5,2.6,Math.PI,0);c.lineTo(2.6,6);c.fill()}
+    else if(k==='yard'){for(const yy of[-5,-1.5,2,5.5]){c.moveTo(-8,yy);c.lineTo(8,yy)}c.lineWidth=1.3;c.stroke()}
+    else if(k==='siding'){c.moveTo(-8,4);c.lineTo(8,4);c.moveTo(-4,4);c.lineTo(5,-4);c.lineTo(8,-4);c.stroke()}
+    else if(k==='overpass'){c.fillRect(-8,-3,16,2.4);c.moveTo(-5,-1);c.lineTo(-5,6);c.moveTo(5,-1);c.lineTo(5,6);c.stroke()}
+    c.restore()};
+  const evs=[];for(const S of sl){const e=S.done?S.act:(S.ev&&S.ev.start&&!S.ev.started?S.ev:null);if(!e)continue;const n=e.n||(e.kind==='station'?(e.island?5:3):1);evs.push({k:e.kind==='station'&&e.island?'island':e.kind,ax:S.ax,n,name:e.name||(S.done&&e.kind==='station'?e.name:null)})}
+  for(const e of evs){if(e.n>1){const x0=X(e.ax),x1=X(e.ax+e.n*CL);c.fillStyle='rgba(232,228,216,.45)';c.fillRect(x0,BY-3,x1-x0,2)}}
+  for(const e of evs){const x=X(e.ax+(e.n>1?Math.min(e.n*CL/2,60):CL/2));c.globalAlpha=1;icon(e.k,x,BY-13);c.beginPath();c.moveTo(x,BY-5);c.lineTo(x,BY-3);c.strokeStyle='rgba(232,228,216,.7)';c.lineWidth=1;c.stroke();
+    if(e.name){c.font='600 10.5px system-ui,sans-serif';c.fillStyle=IC;c.textAlign='center';c.textBaseline='alphabetic';c.fillText(e.name,x,BY-24);c.textAlign='left';c.textBaseline='middle'}}
+  // the part already travelled is dimmed
+  c.fillStyle='rgba(16,18,20,.45)';c.fillRect(m,0,(W-2*m)/2,H);c.restore();
+  c.fillStyle='#9a968c';c.font='10px system-ui,sans-serif';c.textBaseline='top';for(const[d,t]of[[-2000,'−2 км'],[-1000,'−1 км'],[1000,'+1 км'],[2000,'+2 км']]){const x=X(odo+d);c.fillRect(x-.5,BY+BH+2,1,5);c.textAlign=d===-2000?'left':d===2000?'right':'center';c.fillText(t,x,BY+BH+8)}c.textAlign='left';
+  const cx=X(odo);c.fillStyle='#f0c860';c.shadowColor='#f0c860';c.shadowBlur=6;c.fillRect(cx-1,BY-22,2,BH+24);c.shadowBlur=0;
+  c.beginPath();c.moveTo(cx-11,BY+BH+2);c.lineTo(cx+5,BY+BH+2);c.lineTo(cx+11,BY+BH+7);c.lineTo(cx+11,BY+BH+10);c.lineTo(cx-11,BY+BH+10);c.closePath();c.fill()}
 let SHARED=null;function freeTree(root){if(!SHARED)SHARED=new Set([...Object.values(GEO),PRISM,TANK,PIPE,COOL,UMB_GEO,POOL_GEO,TPOOL_GEO,WT_SHAFT,WT_TANK,WT_RING,WT_ROOF,WT_CAP]);
   root.traverse(o=>{if(o.isInstancedMesh&&o.dispose)o.dispose();if(o.geometry&&!o.isSprite&&!SHARED.has(o.geometry))o.geometry.dispose();if(o.userData.ownMat&&o.material){if(o.material.map)o.material.map.dispose();o.material.dispose()}})}
 function dropChunk(g){world.remove(g);freeTree(g);if(annDone===g)annDone=null;if(stationRef===g&&stState==='none')stationRef=null}
@@ -1233,13 +1324,13 @@ function swapSeat(){if(tr||viewMode!=='seat')return;SEAT=SEAT===SEAT1?SEAT2:SEAT
 {let rT=0,tT=0,tx=0,ty=0;addEventListener('dblclick',e=>{if(e.target.closest&&e.target.closest('#menu'))return;e.preventDefault();clearTimeout(menuClickT);menuClickT=null;swapSeat()});
   addEventListener('touchend',e=>{const t=e.changedTouches[0];if(!t||(e.target.closest&&e.target.closest('#menu')))return;const n=performance.now();if(n-tT<350&&Math.hypot(t.clientX-tx,t.clientY-ty)<40){tT=0;e.preventDefault();clearTimeout(menuClickT);menuClickT=null;swapSeat()}else{tT=n;tx=t.clientX;ty=t.clientY}},{passive:false})}
 function toggleSeat(){if(tr)return;if(viewMode==='seat'){viewMode='moving';goTo(STAND,()=>viewMode='walk')}else if(viewMode==='walk'){viewMode='moving';if(document.pointerLockElement)document.exitPointerLock();goTo(SEAT,()=>viewMode='seat')}}
-addEventListener('keydown',e=>{if(!TEST_TOOLS&&/^Numpad(Subtract|Add|4|7|8|9)$/.test(e.code))return;if(['ArrowUp','ArrowDown','ArrowLeft','ArrowRight','Space'].includes(e.code))e.preventDefault();if(e.code==='KeyE'&&!e.repeat){toggleSeat();return}if(e.code==='NumpadSubtract'&&!e.repeat){if(stState!=='none')toast('Тест: потяг уже біля станції');else{forceStation=true;forceIsland=true;nextStationAbs=odo;toast(sid?'Тест: острівна станція — одразу після бічної колії':'Тест: створюю станцію з платформою між коліями…')}return}
+addEventListener('keydown',e=>{if(!TEST_TOOLS&&/^Numpad(Subtract|Add|4|7|8|9)$/.test(e.code))return;if(['ArrowUp','ArrowDown','ArrowLeft','ArrowRight','Space'].includes(e.code))e.preventDefault();if(e.code==='KeyE'&&!e.repeat){toggleSeat();return}if(e.code==='NumpadSubtract'&&!e.repeat){if(stState!=='none')toast('Тест: потяг уже біля станції');else if(!planOff){insertEvent('station',{island:true,stand:false});toast('Тест: острівна станція попереду')}else{forceStation=true;forceIsland=true;nextStationAbs=odo;toast(sid?'Тест: острівна станція — одразу після бічної колії':'Тест: створюю станцію з платформою між коліями…')}return}
   if(TEST_TOOLS&&e.code==='KeyP'&&!e.repeat){paused=!paused;if(ac&&master){const t=ac.currentTime;master.gain.cancelScheduledValues(t);master.gain.setValueAtTime(master.gain.value,t);master.gain.linearRampToValueAtTime(paused||muted?0:1,t+(paused?1:3))}toast(paused?'Тест: пауза':'Тест: продовжуємо');return}
-  if(e.code==='Numpad7'&&!e.repeat){if(yardPlan||forceYard||yards.some(y=>odo<y.a1))toast('Тест: стоянка вже попереду');else{forceYard=true;toast('Тест: створюю стоянку поїздів…')}return}
-  if(e.code==='Numpad4'&&!e.repeat){if(stState!=='none')toast('Тест: потяг уже біля станції');else{forceStation=true;forceIsland=true;forceStandTrain=true;nextStationAbs=odo;toast('Тест: острівна станція з потягом на зустрічній колії…')}return}
+  if(e.code==='Numpad7'&&!e.repeat){if(yardPlan||forceYard||yards.some(y=>odo<y.a1))toast('Тест: стоянка вже попереду');else if(!planOff){insertEvent('yard');toast('Тест: стоянка поїздів попереду')}else{forceYard=true;toast('Тест: створюю стоянку поїздів…')}return}
+  if(e.code==='Numpad4'&&!e.repeat){if(stState!=='none')toast('Тест: потяг уже біля станції');else if(!planOff){insertEvent('station',{island:true,stand:true});toast('Тест: острівна станція з потягом попереду')}else{forceStation=true;forceIsland=true;forceStandTrain=true;nextStationAbs=odo;toast('Тест: острівна станція з потягом на зустрічній колії…')}return}
   if(e.code==='Numpad9'&&!e.repeat){if(otherG)toast('Тест: зустрічний потяг уже їде');else if(yardPlan||yards.some(y=>odo>y.a0-900&&odo<y.a1+60))toast('Тест: на стоянці зустрічні не ходять');else{otherT=0;toast('Тест: запускаю зустрічний потяг…')}return}
-  if(e.code==='Numpad8'&&!e.repeat){if(valley&&valley.kind==='tunnel'||forceTun)toast('Тест: тунель уже попереду');else{forceTun=true;toast('Тест: створюю тунель…')}return}
-  if(e.code==='NumpadAdd'&&!e.repeat){if(stState!=='none')toast('Тест: потяг уже біля станції');else{forceStation=true;nextStationAbs=odo;toast(sid?'Тест: станція — одразу після бічної колії':'Тест: створюю станцію…')}return}if(e.code==='KeyM'&&!e.repeat){muted=!muted;if(master)master.gain.setTargetAtTime(muted?0:1,ac.currentTime,.05);return}keys.add(e.code)});
+  if(e.code==='Numpad8'&&!e.repeat){if(valley&&valley.kind==='tunnel'||forceTun)toast('Тест: тунель уже попереду');else if(!planOff){insertEvent('tunnel');toast('Тест: тунель попереду')}else{forceTun=true;toast('Тест: створюю тунель…')}return}
+  if(e.code==='NumpadAdd'&&!e.repeat){if(stState!=='none')toast('Тест: потяг уже біля станції');else if(!planOff){insertEvent('station',{});toast('Тест: станція попереду')}else{forceStation=true;nextStationAbs=odo;toast(sid?'Тест: станція — одразу після бічної колії':'Тест: створюю станцію…')}return}if(e.code==='KeyM'&&!e.repeat){muted=!muted;if(master)master.gain.setTargetAtTime(muted?0:1,ac.currentTime,.05);return}keys.add(e.code)});
 addEventListener('keyup',e=>keys.delete(e.code));addEventListener('blur',()=>keys.clear());
 cv.addEventListener('click',e=>{if(viewMode==='walk'&&!document.pointerLockElement&&cv.requestPointerLock){try{const r=cv.requestPointerLock();if(r&&r.catch)r.catch(()=>{})}catch(err){}return}
   if(!MENU_ENABLED||viewMode==='walk')return;clearTimeout(menuClickT);if(e.detail>1){menuClickT=null;return}menuClickT=setTimeout(()=>{menuClickT=null;showMenu(menuEl.hidden)},300)});
@@ -1253,10 +1344,10 @@ for(let x=-360;x<=320;x+=CL)makeChunk(x,biome);
 let T=0,last=performance.now(),clackT=0,clackN=0,bump=0,gust=0;
 function frame(now){const rdt=Math.min(.05,(now-last)/1000);last=now;timeScale+=Math.max(-rdt/1,Math.min(rdt/3,(paused?0:1)-timeScale));const dt=rdt*timeScale;T+=dt;
   // schedule
-  biomeT-=dt;if(biomeT<=0){biome=pickBiome(biome);biomeT=rr(18,42)}
+  if(planOff){biomeT-=dt;if(biomeT<=0){biome=pickBiome(biome);biomeT=rr(18,42)}}else if(chunks.length){const S=getS(slotK(chunks[chunks.length-1].userData.ax)+1);if(S.b)biome=S.b==='yard'?'depot':S.b}
   weatherT-=dt;if(weatherT<=0){weather=pick(WKEYS.filter(k=>k!==weather&&(!clearDay||k==='overcast'||k==='dusk')));weatherT=rr(28,70)}
   speedT-=dt;if(speedT<=0){speedTarget=biome==='city'||biome==='depot'||biome==='pgt'?rr(13,19):rr(18,30);speedT=rr(15,35)}
-  if(odo+360>=nextStationAbs&&stState==='none'&&!sid&&!valley&&!yardPlan&&(forceStation||!roads.length||odo+330-roads[roads.length-1].ax>400)){if(forceStation){forceStation=false;forceShown=true}if(biome==='lake'||biome==='industrial'||biome==='depot'||biome==='yard')biome=pick(['city','cityforest','field','forest','village']);{stType=biome==='city'?pick(['city','city','big']):biome==='cityforest'||biome==='pgt'?pick(['city','halt']):pick(['halt','rural']);stationRef=null;stState='coming';if(forceIsland&&stType!=='halt'&&stType!=='city')stType=biome==='city'?'city':'halt';stShift=(stType==='halt'||stType==='city')&&!otherG&&(forceIsland||chance(.3));forceIsland=false;stationBuild=stShift?5:3;biomeT=Math.max(biomeT,45);if(chance(.25)&&!clearDay){fogMulT=pick([.07,.09]);fogMulTimer=70}}nextStationAbs=odo+360+rr(4000,9000)}
+  if(planOff&&odo+360>=nextStationAbs&&stState==='none'&&!sid&&!valley&&!yardPlan&&(forceStation||!roads.length||odo+330-roads[roads.length-1].ax>400)){if(forceStation){forceStation=false;forceShown=true}if(biome==='lake'||biome==='industrial'||biome==='depot'||biome==='yard')biome=pick(['city','cityforest','field','forest','village']);{stType=biome==='city'?pick(['city','city','big']):biome==='cityforest'||biome==='pgt'?pick(['city','halt']):pick(['halt','rural']);stationRef=null;stState='coming';if(forceIsland&&stType!=='halt'&&stType!=='city')stType=biome==='city'?'city':'halt';stShift=(stType==='halt'||stType==='city')&&!otherG&&(forceIsland||chance(.3));forceIsland=false;stationBuild=stShift?5:3;biomeT=Math.max(biomeT,45);if(chance(.25)&&!clearDay){fogMulT=pick([.07,.09]);fogMulTimer=70}}nextStationAbs=odo+360+rr(4000,9000)}
   if(stState==='none')speed+=(speedTarget-speed)*dt*.08;
   else if(stState==='coming'){speed+=(Math.min(speedTarget,17)-speed)*dt*.08;if(stationRef){const d=stationRef.position.x+SIGNX-7,vb=Math.sqrt(1.6*Math.max(0,d));if(vb<speed){speed=vb;if(!squeal&&speed<6){squeal=1;brake()}}if(d<=.05){speed=0;stState='stopped';stopT=stType==='city'||stType==='big'?rr(40,60):rr(20,30);stopFull=stopT;squeal=0}}}
   if(forceShown&&stationRef&&stationRef.userData.stName){forceShown=false;toast('Тест: станція «'+stationRef.userData.stName+'» ('+({city:'міська',big:'вокзал',halt:'зупинний пункт',rural:'сільська'}[stType])+(stShift||stationRef.userData.stz?', острівна':'')+'), до неї ~'+Math.round(stationRef.position.x+SIGNX-7)+' м')}
@@ -1346,6 +1437,7 @@ function frame(now){const rdt=Math.min(.05,(now-last)/1000);last=now;timeScale+=
   const bob=moving?Math.sin(T*9)*.012:0,sw=Math.min(1,speed/8),cx=pose.x+Math.sin(T*1.3)*.004*sw,cy=1.4+pose.y+Math.sin(T*2.1)*.003*sw+bump*(rnd()-.3)+bob;
   camera.position.set(cx,cy,pose.z);camera.lookAt(cx+Math.cos(pose.a)*Math.cos(pose.p),cy+Math.sin(pose.p),pose.z+Math.sin(pose.a)*Math.cos(pose.p));
   const flip=pose.z>CZ+.05,fz=flip?-1:1,cz0=flip?WZ+OZ:0;{const a=yardZAt(odo-1.5),b=yardZAt(odo+1.5);yardZS=(a+b)/2;yardPhi=Math.atan2(b-a,3)}outside.scale.z=fz;outside.rotation.y=fz*yardPhi;outside.position.x=-fz*yardZS*Math.sin(fz*yardPhi);outside.position.z=cz0-fz*yardZS*Math.cos(fz*yardPhi);
+  routeT-=rdt;if(routeT<=0){routeT=.12;routeDraw()}
   drawView();requestAnimationFrame(frame)}
 requestAnimationFrame(frame);
 })();
