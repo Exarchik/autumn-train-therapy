@@ -9,7 +9,7 @@ html,body{margin:0;height:100%;background:var(--bg);overflow:hidden}
 .vig{position:fixed;inset:0;pointer-events:none;box-shadow:inset 0 0 22vmin rgba(0,0,0,.55)}
 .vigL,.vigR{position:fixed;top:0;bottom:0;width:50vw;pointer-events:none;box-shadow:inset 0 0 14vmin rgba(0,0,0,.55);display:none}
 .vigL{left:0;border-right:2px solid #000}.vigR{right:0}
-body.stereo .vig{display:none}body.stereo .vigL,body.stereo .vigR{display:block}
+body.stereo .vig{display:none}body.stereo .vigL,body.stereo .vigR{display:block}body.lens .vigL,body.lens .vigR,body.lens .scan{display:none}
 body.menu-open #c{cursor:default}
 #menu{position:fixed;left:max(12px,env(safe-area-inset-left));top:50%;transform:translateY(-50%);display:flex;flex-direction:column;gap:8px;padding:8px;background:rgba(20,22,24,.74);border-radius:12px;z-index:5;box-shadow:0 4px 18px rgba(0,0,0,.35)}
 #menu[hidden]{display:none}
@@ -20,22 +20,26 @@ body.menu-open #c{cursor:default}
 </style>
 <canvas id="c" aria-label="Вид з вікна потяга, що їде крізь осінь"></canvas>
 <div class="scan"></div><div class="vig"></div><div class="vigL"></div><div class="vigR"></div>
-<nav id="menu" hidden aria-label="Меню"><button id="mStereo" type="button" aria-label="Стерео-режим" aria-pressed="false" title="Стерео-режим"><svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="6.5" cy="14" r="3.6"/><circle cx="17.5" cy="14" r="3.6"/><path d="M10.1 13.4q1.9-1.6 3.8 0M2.9 13.2 4.6 7.5h2M21.1 13.2 19.4 7.5h-2"/></svg></button></nav><div id="toast" style="position:fixed;left:16px;top:16px;font:600 13px/1.4 system-ui,sans-serif;color:#e8e4d8;background:rgba(20,22,24,.72);padding:6px 10px;border-radius:4px;pointer-events:none;opacity:0;transition:opacity .4s"></div>
+<nav id="menu" hidden aria-label="Меню"><button id="mStereo" type="button" aria-label="Стерео-режим" aria-pressed="false" title="Стерео-режим"><svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="6.5" cy="14" r="3.6"/><circle cx="17.5" cy="14" r="3.6"/><path d="M10.1 13.4q1.9-1.6 3.8 0M2.9 13.2 4.6 7.5h2M21.1 13.2 19.4 7.5h-2"/></svg></button><button id="mLens" type="button" aria-label="Корекція лінз VR-окулярів" aria-pressed="false" title="Корекція лінз"><svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M3 7.5Q3 5 5.5 5h13Q21 5 21 7.5v8q0 2.5-2.5 2.5h-3.2l-1.8-2.6q-1.5-1.8-3 0L8.7 18H5.5Q3 18 3 15.5z"/><circle cx="8" cy="11" r="2.3"/><circle cx="16" cy="11" r="2.3"/></svg></button></nav><div id="toast" style="position:fixed;left:16px;top:16px;font:600 13px/1.4 system-ui,sans-serif;color:#e8e4d8;background:rgba(20,22,24,.72);padding:6px 10px;border-radius:4px;pointer-events:none;opacity:0;transition:opacity .4s"></div>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script>
 (()=>{
 /* ---------- switches ---------- */
 const MENU_ENABLED=true;   // single click / tap opens the side menu (stereo mode etc.)
 const TEST_TOOLS=true;     // NumPad test keys: + station, − island, 4 island with train, 7 yard, 8 tunnel, 9 oncoming train
-const STEREO_EYE=.15;      // the second (right-half) camera sits this far to the LEFT of the first, metres
-let stereo=false,menuClickT=null,paused=false,timeScale=1;
+const STEREO_EYE=.07;      // distance between the two stereo cameras, metres
+const STEREO_SIDE=1;       // where the second (right-half) camera sits: 1 = to the right (correct for VR glasses), -1 = to the left (cross-eyed viewing)
+const LENS_K1=.22,LENS_K2=.24;  // barrel distortion for VR lenses (bigger = stronger "fish-eye")
+const LENS_FOV=88;         // vertical field of view of each eye when lens mode is on, degrees
+const LENS_CA=.012;        // colour fringe correction for cheap lenses (0 = off)
+let stereo=false,lens=false,lensRT=null,menuClickT=null,paused=false,timeScale=1;
 /* ---------- renderer ---------- */
 const cv=document.getElementById('c');
 const renderer=new THREE.WebGLRenderer({canvas:cv,antialias:false});renderer.setPixelRatio(1);
 const scene=new THREE.Scene();
 const camera=new THREE.PerspectiveCamera(52,16/9,.1,800);
 const SNAP=new THREE.Vector2(160,90);
-function resize(){const a=innerWidth/Math.max(1,innerHeight),rh=a<1?400:300;renderer.setSize(Math.round(rh*a),rh,false);const ea=stereo?a/2:a;camera.aspect=ea;camera.fov=stereo?(ea<1?80:66):(a<1?80:58);camera.updateProjectionMatrix();SNAP.set(Math.round(rh*a)/(stereo?2.4:1.2),rh/1.2)}
+function resize(){const a=innerWidth/Math.max(1,innerHeight),rh=a<1?400:300;renderer.setSize(Math.round(rh*a),rh,false);const ea=stereo?a/2:a;camera.aspect=ea;camera.fov=stereo?(lens?LENS_FOV:(ea<1?80:66)):(a<1?80:58);camera.updateProjectionMatrix();if(lensRT)for(const t of lensRT)t.setSize(Math.max(1,Math.round(rh*a)>>1),rh);SNAP.set(Math.round(rh*a)/(stereo?2.4:1.2),rh/1.2)}
 addEventListener('resize',resize);resize();
 
 /* ---------- PS1 look: snapped vertices, affine textures, dithered colour ---------- */
@@ -1048,18 +1052,37 @@ function whLife(ch,x0,len,zf,doors,lim){const Y0=1.15;
   const dr=doors.length?pick(doors):null,tl=7.2,z0=zf+2.7+tl/2,pull=Math.min(8,lim-(zf+2.7+tl));if(dr!==null&&pull>2.5&&chance(.6)){doors.busy=[dr];const t=vehicle('truck');t.v.position.set(dr,0,z0);t.v.rotation.y=Math.PI;ch.add(t.v);let st=0,w=rr(6,20),zz=0;
     anim(ch,dt=>{if(st===0){w-=dt;if(w<=0)st=1}else if(st===1){zz+=1.6*dt;if(zz>=pull){zz=pull;st=2;w=rr(4,9)}}else if(st===2){w-=dt;if(w<=0)st=3}else{zz-=.9*dt;if(zz<=0){zz=0;st=0;w=rr(10,25)}}t.v.position.z=z0+zz})}}
 const camR=new THREE.PerspectiveCamera(),VS=new THREE.Vector2();
-function drawView(){if(!stereo){renderer.render(scene,camera);return}renderer.getSize(VS);const w=VS.x>>1,h=VS.y;
+let lensScene=null,lensCam=null;
+function lensSetup(){renderer.getSize(VS);const w=Math.max(1,VS.x>>1),h=VS.y;lensRT=[0,1].map(()=>{const t=new THREE.WebGLRenderTarget(w,h,{minFilter:THREE.NearestFilter,magFilter:THREE.NearestFilter});return t});
+  lensScene=new THREE.Scene();lensCam=new THREE.OrthographicCamera(-1,1,1,-1,0,1);
+  lensRT.forEach((rt,i)=>{const m=new THREE.ShaderMaterial({uniforms:{tex:{value:rt.texture},k1:{value:LENS_K1},k2:{value:LENS_K2},ca:{value:LENS_CA},asp:{value:1}},depthTest:false,depthWrite:false,
+    vertexShader:'varying vec2 vUv;void main(){vUv=uv;gl_Position=vec4((modelMatrix*vec4(position,1.)).xy,0.,1.);}',
+    fragmentShader:`uniform sampler2D tex;uniform float k1,k2,ca,asp;varying vec2 vUv;
+      vec2 warp(vec2 p,float s){float r2=dot(p,p);float f=(1.+k1*r2+k2*r2*r2)*s/(1.+k1+k2);return p*f;}
+      float inside(vec2 q){vec2 d=abs(q-.5);return step(d.x,.5)*step(d.y,.5);}
+      void main(){vec2 p=(vUv-.5)*2.;p.x*=asp;
+        vec2 qg=warp(p,1.),qr=warp(p,1.+ca),qb=warp(p,1.-ca);qg.x/=asp;qr.x/=asp;qb.x/=asp;qg=qg*.5+.5;qr=qr*.5+.5;qb=qb*.5+.5;
+        vec3 c=vec3(texture2D(tex,qr).r*inside(qr),texture2D(tex,qg).g*inside(qg),texture2D(tex,qb).b*inside(qb));
+        vec2 e=abs(qg-.5)*2.;float edge=1.-smoothstep(.93,1.,max(e.x,e.y));gl_FragColor=vec4(c*edge,1.);}`});
+    const q=new THREE.Mesh(new THREE.PlaneGeometry(1,2),m);q.position.x=i?.5:-.5;q.frustumCulled=false;lensScene.add(q)})}
+function drawLens(){if(!lensRT)lensSetup();renderer.getSize(VS);const w=VS.x>>1,h=VS.y;if(lensRT[0].width!==Math.max(1,w)||lensRT[0].height!==h)for(const t of lensRT)t.setSize(Math.max(1,w),h);
+  for(const q of lensScene.children){q.material.uniforms.asp.value=w/h;q.material.uniforms.k1.value=LENS_K1;q.material.uniforms.k2.value=LENS_K2}
+  renderer.setRenderTarget(lensRT[0]);renderer.render(scene,camera);camR.copy(camera);camR.translateX(STEREO_SIDE*STEREO_EYE);camR.updateMatrixWorld();renderer.setRenderTarget(lensRT[1]);renderer.render(scene,camR);
+  renderer.setRenderTarget(null);renderer.render(lensScene,lensCam)}
+function drawView(){if(!stereo){renderer.render(scene,camera);return}if(lens){drawLens();return}renderer.getSize(VS);const w=VS.x>>1,h=VS.y;
   renderer.setScissorTest(true);renderer.setViewport(0,0,w,h);renderer.setScissor(0,0,w,h);renderer.render(scene,camera);
-  camR.copy(camera);camR.translateX(-STEREO_EYE);camR.updateMatrixWorld();renderer.setViewport(w,0,VS.x-w,h);renderer.setScissor(w,0,VS.x-w,h);renderer.render(scene,camR);
+  camR.copy(camera);camR.translateX(STEREO_SIDE*STEREO_EYE);camR.updateMatrixWorld();renderer.setViewport(w,0,VS.x-w,h);renderer.setScissor(w,0,VS.x-w,h);renderer.render(scene,camR);
   renderer.setScissorTest(false);renderer.setViewport(0,0,VS.x,h)}
 // side menu: one click / tap shows it, a second one hides it
-const menuEl=document.getElementById('menu'),mStereo=document.getElementById('mStereo');let menuHideT=null;
-function setStereo(on){stereo=on;document.body.classList.toggle('stereo',on);mStereo.setAttribute('aria-pressed',on?'true':'false');resize();try{localStorage.setItem('autumnTrain.stereo',on?'1':'0')}catch(e){}}
+const menuEl=document.getElementById('menu'),mStereo=document.getElementById('mStereo'),mLens=document.getElementById('mLens');let menuHideT=null;
+function setLens(on){lens=on;document.body.classList.toggle('lens',on);mLens.setAttribute('aria-pressed',on?'true':'false');if(on&&!stereo)setStereo(true);else resize();try{localStorage.setItem('autumnTrain.lens',on?'1':'0')}catch(e){}}
+function setStereo(on){stereo=on;if(!on&&lens){lens=false;mLens.setAttribute('aria-pressed','false');document.body.classList.remove('lens');try{localStorage.setItem('autumnTrain.lens','0')}catch(e){}}document.body.classList.toggle('stereo',on);mStereo.setAttribute('aria-pressed',on?'true':'false');resize();try{localStorage.setItem('autumnTrain.stereo',on?'1':'0')}catch(e){}}
 function showMenu(on){if(!MENU_ENABLED)on=false;menuEl.hidden=!on;document.body.classList.toggle('menu-open',on);clearTimeout(menuHideT);if(on)menuHideT=setTimeout(()=>showMenu(false),6000)}
 mStereo.addEventListener('click',e=>{e.stopPropagation();setStereo(!stereo);showMenu(true)});
+mLens.addEventListener('click',e=>{e.stopPropagation();setLens(!lens);showMenu(true)});
 menuEl.addEventListener('pointerdown',e=>e.stopPropagation());
 addEventListener('keydown',e=>{if(e.code==='Escape'&&!menuEl.hidden)showMenu(false)});
-if(MENU_ENABLED){try{if(localStorage.getItem('autumnTrain.stereo')==='1')setStereo(true)}catch(e){}}
+if(MENU_ENABLED){try{if(localStorage.getItem('autumnTrain.stereo')==='1')setStereo(true);if(localStorage.getItem('autumnTrain.lens')==='1')setLens(true)}catch(e){}}
 let SHARED=null;function freeTree(root){if(!SHARED)SHARED=new Set([...Object.values(GEO),PRISM,TANK,PIPE,COOL,UMB_GEO,POOL_GEO,TPOOL_GEO,WT_SHAFT,WT_TANK,WT_RING,WT_ROOF,WT_CAP]);
   root.traverse(o=>{if(o.isInstancedMesh&&o.dispose)o.dispose();if(o.geometry&&!o.isSprite&&!SHARED.has(o.geometry))o.geometry.dispose();if(o.userData.ownMat&&o.material){if(o.material.map)o.material.map.dispose();o.material.dispose()}})}
 function dropChunk(g){world.remove(g);freeTree(g);if(annDone===g)annDone=null;if(stationRef===g&&stState==='none')stationRef=null}
