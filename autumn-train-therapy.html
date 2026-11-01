@@ -22,7 +22,7 @@ body.menu-open #c{cursor:default}
 #settings select{font:inherit;color:#e8e4d8;background:#2c2f32;border:1px solid rgba(255,255,255,.14);border-radius:8px;padding:6px 8px;min-width:196px}
 #settings select:focus-visible,#settings button:focus-visible{outline:2px solid #e8c27a;outline-offset:2px}
 #settings .x{width:36px;height:36px;border:0;border-radius:9px;background:rgba(255,255,255,.08);color:#e8e4d8;font-size:20px;line-height:1;cursor:pointer}
-#route{position:fixed;left:16px;bottom:10px;width:calc(100vw - 32px);height:88px;z-index:4;cursor:pointer;-webkit-tap-highlight-color:transparent}#route.compact{height:30px}#route{transition:opacity .6s}#route.faded{opacity:.33}#route[hidden]{display:none}body.stereo #route{display:none}
+#route{position:fixed;left:16px;bottom:10px;width:calc(100vw - 32px);height:88px;z-index:4;cursor:pointer;-webkit-tap-highlight-color:transparent}#route.compact{height:30px}#route{transition:opacity .6s}#route.faded{opacity:.4}#route[hidden]{display:none}body.stereo #route{display:none}
 #menu button{width:48px;height:48px;border:0;border-radius:9px;background:rgba(255,255,255,.07);color:#e8e4d8;display:grid;place-items:center;cursor:pointer;padding:0;-webkit-tap-highlight-color:transparent}
 #menu button:hover{background:rgba(255,255,255,.14)}
 #menu button[aria-pressed="true"]{background:#c88a3a;color:#1c1a18}
@@ -32,9 +32,9 @@ body.menu-open #c{cursor:default}
 <div class="scan"></div><div class="vig"></div><div class="vigL"></div><div class="vigR"></div>
 <nav id="menu" hidden aria-label="Меню"><button id="mStereo" type="button" aria-label="Стерео-режим" aria-pressed="false" title="Стерео-режим"><svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="6.5" cy="14" r="3.6"/><circle cx="17.5" cy="14" r="3.6"/><path d="M10.1 13.4q1.9-1.6 3.8 0M2.9 13.2 4.6 7.5h2M21.1 13.2 19.4 7.5h-2"/></svg></button><button id="mLens" type="button" aria-label="Корекція лінз VR-окулярів" aria-pressed="false" title="Корекція лінз"><svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M3 7.5Q3 5 5.5 5h13Q21 5 21 7.5v8q0 2.5-2.5 2.5h-3.2l-1.8-2.6q-1.5-1.8-3 0L8.7 18H5.5Q3 18 3 15.5z"/><circle cx="8" cy="11" r="2.3"/><circle cx="16" cy="11" r="2.3"/></svg></button><button id="mMap" type="button" aria-label="Схема маршруту" aria-pressed="false" title="Схема маршруту"><svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6l6-2 6 2 6-2v14l-6 2-6-2-6 2z"/><path d="M9 4v14M15 6v14"/></svg></button><button id="mSet" type="button" aria-label="Налаштування" aria-pressed="false" title="Налаштування"><svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3.2"/><path d="M12 2.8v2.6M12 18.6v2.6M2.8 12h2.6M18.6 12h2.6M5.5 5.5l1.9 1.9M16.6 16.6l1.9 1.9M5.5 18.5l1.9-1.9M16.6 7.4l1.9-1.9"/></svg></button></nav><canvas id="route" hidden></canvas>
 <div id="settings" hidden role="dialog" aria-modal="true" aria-labelledby="setTitle"><div class="box"><div class="head"><h2 id="setTitle">Налаштування</h2><button class="x" id="setClose" type="button" aria-label="Закрити">×</button></div>
-<label>Довжина дня<select id="setDay"><option value="default">За замовчуванням</option><option value="short">Короткий день</option><option value="normal">Звичайний день</option><option value="long">Довгий день</option></select></label>
-<label>Довжина ночі<select id="setNight"><option value="default">За замовчуванням</option><option value="short">Коротка ніч</option><option value="normal">Звичайна ніч</option><option value="long">Довга ніч</option></select></label>
-<label>Яскравість ночі<select id="setBright"><option value="default">За замовчуванням</option><option value="light">Світла ніч</option><option value="dark">Темна ніч</option></select></label></div></div><div id="toast" style="position:fixed;left:16px;top:16px;font:600 13px/1.4 system-ui,sans-serif;color:#e8e4d8;background:rgba(20,22,24,.72);padding:6px 10px;border-radius:4px;pointer-events:none;opacity:0;transition:opacity .4s"></div>
+<label>Довжина дня<select id="setDay"><option value="default">За замовчуванням</option><option value="short">Короткий день</option><option value="normal">Звичайний день *</option><option value="long">Довгий день</option></select></label>
+<label>Довжина ночі<select id="setNight"><option value="default">За замовчуванням</option><option value="short">Коротка ніч *</option><option value="normal">Звичайна ніч</option><option value="long">Довга ніч</option></select></label>
+<label>Яскравість ночі<select id="setBright"><option value="default">За замовчуванням</option><option value="light">Світла ніч</option><option value="dark">Темна ніч *</option></select></label></div></div><div id="toast" style="position:fixed;left:16px;top:16px;font:600 13px/1.4 system-ui,sans-serif;color:#e8e4d8;background:rgba(20,22,24,.72);padding:6px 10px;border-radius:4px;pointer-events:none;opacity:0;transition:opacity .4s"></div>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script>
 (()=>{
@@ -258,6 +258,7 @@ function peopleUpd(g,dt){const ppl=g.userData.people;if(!ppl)return;const still=
       if(show){if(q.fum>0){q.uc.scale.set(.22,1.5,.22);q.u.rotation.z=Math.sin(T*9+q.ph)*.35}else{const k=ease(Math.max(0,Math.min(1,q.uk))),j=k<1?Math.sin(k*Math.PI)*.12:0;q.uc.scale.set(.22+.78*k,1.5-.5*k+j,.22+.78*k);q.u.rotation.z=0}}}
     if(q.wk){workerUpd(g,q,dt,dist,pan);continue}
     if(q.brd){if(boardUpd(g,q,dt)){g.remove(q.p);ppl.splice(i,1)}continue}
+    if(q.alight){if(alightUpd(g,q,dt))alightDone(g,q);continue}
     if(q.tour){q.hood.visible=cur.r>.3;const sit=q.sk>.5;const sd=sit&&q.seat&&q.seat.edge?-q.seat.edge:1;q.pack.position.set(sit?.72*sd:0,sit?.34:.95,sit?-.1:.27);q.pack.rotation.y=sit?.5*sd:0}
     if(q.run){if(exitWalk(g,q,dt)){g.remove(q.p);ppl.splice(i,1);continue}q.p.rotation.y=q.st===2?0:Math.PI/2;const ph=T*11+q.ph,sw=Math.sin(ph)*.85;q.legs[0].rotation.x=sw;q.legs[1].rotation.x=-sw;setArm(q.arms[0],[-sw*.9,0,0,1.3]);setArm(q.arms[1],[sw*.9,0,0,1.3]);q.p.rotation.x=-.2;q.p.position.y=(q.by!==undefined?q.by:q.y0)+Math.abs(Math.cos(ph))*.09;q.hd.rotation.x=.1;continue}
     let hx=Math.sin(T*.5+q.ph)*.03,hy=0,bx=0,a0=[0,0,0,.12],a1=[0,0,0,.12],legA=0;
@@ -336,6 +337,24 @@ function workerUpd(g,q,dt,dist,pan){const w=q.wk,P=q.p.position;let a0=[0,0,0,.1
 function boardUpd(g,q,dt){const P=q.p.position,b=q.brd,dx=b.x-P.x,dz=b.z-P.z,d=Math.hypot(dx,dz);q.sk=0;q.cig.visible=false;q.phone.visible=false;q.puffs.forEach(m=>m.visible=false);q.u.visible=false;
   if(d<.15)return true;const sp=Math.min(d,1.15*dt);P.x+=dx/d*sp;P.z+=dz/d*sp;q.p.rotation.y=Math.atan2(-dx,-dz);q.p.rotation.x=0;const ph=T*6.5+q.ph,sw=Math.sin(ph)*.45;q.legs[0].rotation.x=sw;q.legs[1].rotation.x=-sw;P.y=q.y0+Math.abs(Math.cos(ph))*.03;
   setArm(q.arms[0],[-sw*.5,0,0,.3]);setArm(q.arms[1],[sw*.4,0,0,.3]);q.hd.rotation.set(0,0,0);return false}
+function alightTarget(g,q,x){const pl=g.userData.plat,sl=g.userData.slots||[],ppl=g.userData.people||[];let best=null;
+  for(let i=0;i<14;i++){const tx=Math.max(pl[0]+.8,Math.min(pl[1]-.8,x+rr(-4.5,4.5))),tz=rr(pl[3]+1,Math.max(pl[3]+1.05,pl[2]-.85));
+    if(sl.some(b=>Math.abs(b.x-tx)<.9&&tz>b.z-.75&&tz<b.z+.45))continue;
+    const d=Math.min(9,...ppl.filter(o=>o!==q).map(o=>Math.min(Math.hypot(o.p.position.x-tx,o.p.position.z-tz),o.alight?Math.hypot(o.alight.x-tx,o.alight.z-tz):9)));
+    if(!best||d>best.d)best={x:tx,z:tz,d};if(d>1.4)break}
+  return {x:best?best.x:x,z:best?best.z:pl[3]+1,st:0,w:rr(.1,.5),hold:0}}
+function alightUpd(g,q,dt){const a=q.alight,P=q.p.position,ppl=g.userData.people||[],sl=g.userData.slots||[];q.sk=0;q.cig.visible=false;q.phone.visible=false;q.puffs.forEach(m=>m.visible=false);
+  if(a.w>0){a.w-=dt;q.p.rotation.y=Math.PI;return false}
+  // first step away from the train, then along the platform
+  const tz=a.st===0?a.z:a.z,tx=a.st===0?P.x:a.x;let dx=tx-P.x,dz=tz-P.z,d=Math.hypot(dx,dz);if(a.st===0&&Math.abs(dz)<.05){a.st=1;dx=a.x-P.x;dz=a.z-P.z;d=Math.hypot(dx,dz)}
+  if(a.st===1&&d<.08)return true;
+  const ux=dx/(d||1),uz=dz/(d||1),sp=.85*dt;let blocked=false;
+  for(const o of ppl){if(o===q)continue;const ox=o.p.position.x-P.x,oz=o.p.position.z-P.z,ahead=ox*ux+oz*uz,side=Math.abs(ox*uz-oz*ux);if(ahead>0&&ahead<.85&&side<.55){blocked=true;break}}
+  for(const b of sl){const bx=b.x-P.x,bz=(b.z-.2)-P.z,ahead=bx*ux+bz*uz,side=Math.abs(bx*uz-bz*ux);if(ahead>0&&ahead<.6&&side<.45){blocked=true;break}}
+  if(blocked){a.hold+=dt;if(a.hold>1.2){const s2=a.hold>2.4?-1:1;P.x+=-uz*sp*.8*s2;P.z+=ux*sp*.8*s2;if(a.hold>4)a.hold=0}q.legs[0].rotation.x=q.legs[1].rotation.x=0;P.y=q.y0}
+  else{a.hold=0;P.x+=ux*Math.min(d,sp);P.z+=uz*Math.min(d,sp);const ph=T*6+q.ph,sw=Math.sin(ph)*.42;q.legs[0].rotation.x=sw;q.legs[1].rotation.x=-sw;P.y=q.y0+Math.abs(Math.cos(ph))*.03;setArm(q.arms[0],[-sw*.5,0,0,.3]);setArm(q.arms[1],[sw*.4,0,0,.3])}
+  const pl=g.userData.plat;P.z=Math.max(pl[3]-.2,Math.min(pl[2],P.z));q.p.rotation.y=Math.atan2(-ux,-uz);q.p.rotation.x=0;q.hd.rotation.set(0,0,0);return false}
+function alightDone(g,q){q.alight=null;q.arrived=true;const P=q.p.position;if(chance(.4)){q.leave=true;q.exitX=nearExit(g,P.x);q.v=Math.sign(q.exitX-P.x||1)*rr(.65,.9);q.beh=false}else{q.beh=true;q.v=0;q.act=pick(['smoke','smoke','call','look','idle']);q.bt=rr(6,16);q.wt=rr(4,10);q.p.rotation.y=Math.PI+rr(-.6,.6)}}
 let wetPrev=false;
 function rainStarted(){const cand=[];for(const g of chunks){const pp=g.userData.people;if(!pp)continue;for(const q of pp){const wx=g.position.x+q.p.position.x;if(!q.run&&wx>-5&&wx<70)cand.push(q)}}if(cand.length&&chance(.5))pick(cand).fum=rr(3,6)}
 let stType='city';
@@ -423,6 +442,7 @@ function batchStatic(root){root.updateMatrixWorld(true);const inv=new THREE.Matr
 function wagon(G,x,zc){const t=rnd(),l=rr(12,14);if(t<.45)boxcar(G,x,l,zc,RT-.12);else if(t<.75){addBox(G,MAT.dark,x,RT+.15,zc,l,.4,2.4);const c=new THREE.Mesh(PIPE,pick(TANKM));c.scale.set(l-1.2,2.5,2.5);c.position.set(x,RT+1.9,zc);G.add(c);addBox(G,MAT.dark,x,RT+3.1,zc,.8,.3,.8)}
   else{addBox(G,MAT.dark,x,RT+.15,zc,l,.45,2.4);addBox(G,pick(WAGM),x,RT+.55,zc,l,1.7,2.9);addBox(G,MAT.dark,x,RT+2.0,zc,l-.3,.25,2.6);if(chance(.6)){const h=new THREE.Mesh(PRISM,chance(.5)?MAT.dark:DIRT);h.position.set(x,RT+2.2,zc);h.rotation.y=Math.PI/2;h.scale.set(2.4,.7,l-.8);G.add(h)}}
   for(const a of[-1,1])addBox(G,MAT.dark,x+a*(l/2-1.6),RT-.05,zc,1.9,.5,2.2);return l}
+const SHUNTS=[];function regShunt(o,c){SHUNTS.push({o,c,px:null,mv:0})}
 function shunter(){const t=new THREE.Group(),m=pick(LOCOC);addBox(t,MAT.dark,0,RT,0,13.5,.55,2.4);addBox(t,MAT.dark,-4,RT-.05,0,2.6,.6,2.2);addBox(t,MAT.dark,4,RT-.05,0,2.6,.6,2.2);
   addBox(t,m,-1.6,RT+.55,0,8.6,2.1,2.1);addBox(t,m,4.4,RT+.55,0,3.2,3.0,3.0);addBox(t,m,6.4,RT+.55,0,.8,1.6,2.0);addBox(t,MAT.dark,-1.6,RT+2.65,0,8.6,.08,1.9);
   addBox(t,YELM,-1.6,RT+.95,0,8.65,.18,2.15);addBox(t,YELM,4.4,RT+.95,0,3.25,.18,3.05);for(const sd of[-1,1])addBox(t,WINV,4.4,RT+2.25,sd*1.51,2.2,.75,.04);addBox(t,WINV,5.98,RT+2.25,0,.04,.75,2.2);addBox(t,WINV,2.78,RT+2.25,0,.04,.75,2.2);
@@ -444,7 +464,7 @@ function depotShed(G,e,ph,side,gc,L){const g=new THREE.Group();g.position.set(e[
   {const wl=[];for(let x=3;x<len-2;x+=3.2)for(const sd of[-1,1])wl.push([x,h-3.2,zc+sd*(w/2+.02),1.6,1.6,.05]);g.add(inst(GEO.box,chance(.5)?WINV:WINVD,wl))}
   const ch=new THREE.Mesh(GEO.chimney,BRICKM);ch.position.set(len-4,0,zc+w/2-2);ch.scale.set(1.2,h+7,1.2);g.add(ch);addBox(g,MAT.metal,-6,0,zc+side*-6.5,.25,10,.25);addBox(g,MAT.lamp,-6,9.7,zc+side*-5.9,.6,.15,.3);
   const rq=rnd();if(rq<.3){const t=new THREE.Group();t.position.set(-9,-.68,side*4.5);t.rotation.y=Math.PI;g.add(t);t.add(shunter())}
-  else if(rq<.75&&gc){const t=new THREE.Group();t.position.set(-L+9,-.68,0);g.add(t);t.add(shunter());const n=1+(rnd()*3|0);for(let k=0;k<n;k++)wagon(t,6.9+.9+6.5+k*13.7,0);
+  else if(rq<.75&&gc){const t=new THREE.Group();t.position.set(-L+9,-.68,0);g.add(t);regShunt(t,gc);t.add(shunter());const n=1+(rnd()*3|0);for(let k=0;k<n;k++)wagon(t,6.9+.9+6.5+k*13.7,0);
     const lo=-L+8,hi=Math.max(lo+4,16-n*13.7-7);t.position.x=rr(lo,hi);let v=0,dir=pick([-1,1]),wait=rr(1,5);
     anim(gc,dt=>{if(wait>0){wait-=dt;if(wait<=0){v=0;const wx=gc.position.x+g.position.x;if(Math.abs(wx)<140&&chance(.6))horn(.01*(1-Math.abs(wx)/140),Math.max(-1,Math.min(1,wx/40)))}return}
       v=Math.min(1.8,v+dt*.4);t.position.x+=dir*v*dt;if(t.position.x>hi){t.position.x=hi;dir=-1;wait=rr(5,12)}else if(t.position.x<lo){t.position.x=lo;dir=1;wait=rr(5,12)}})}}
@@ -472,7 +492,7 @@ function sidingChunk(g,c){const p=sid,i=p.i,G=new THREE.Group();G.userData.keep=
   if(p.wag1&&i>=1&&(!last||p.end!=='merge')){let x=rr(2,10);const xe=last?(p.end==='dead'?p.deadX-2:4):CL;while(x<xe-12&&chance(.85)){const l=wagon(WG,x+6.5,z1);x+=l+.9}}
   if(p.wag2&&i>=2&&i<=p.n-2){let x=rr(0,8);const xe=i===p.n-2?p.l2end-2:CL;while(x<xe-12&&chance(.8)){const l=wagon(WG,x+6.5,z2);x+=l+.9}}
   if(WG.children.length)batchStatic(WG)}
-  if(p.shunt&&i===1){const t=new THREE.Group();t.position.set(off+rr(10,20),0,z1);g0.add(t);t.userData.keep=1;const loco=shunter();t.add(loco);let len=13.5;const nw=Math.max(0,Math.min(rnd()*3|0,Math.floor(((p.n-2)*CL-26)/13.7)));for(let k=0;k<nw;k++){const l=wagon(t,-len/2-.9-6.5-k*13.7,0);}len+=nw*13.7;
+  if(p.shunt&&i===1){const t=new THREE.Group();t.position.set(off+rr(10,20),0,z1);g0.add(t);regShunt(t,g0);t.userData.keep=1;const loco=shunter();t.add(loco);let len=13.5;const nw=Math.max(0,Math.min(rnd()*3|0,Math.floor(((p.n-2)*CL-26)/13.7)));for(let k=0;k<nw;k++){const l=wagon(t,-len/2-.9-6.5-k*13.7,0);}len+=nw*13.7;
     const xa=off+8,xb=off+(p.n-2)*CL+(p.end==='merge'||p.startDead?2:-4);let v=0,wait=rr(1,4),dir=pick([-1,1]);
     anim(g0,dt=>{if(wait>0){wait-=dt;if(wait<=0){v=0;const wx=g0.position.x+t.position.x;if(Math.abs(wx)<120)horn(.012*(1-Math.abs(wx)/120),Math.max(-1,Math.min(1,wx/40)))}return}
       v=Math.min(2.6,v+dt*.5);t.position.x+=dir*v*dt;if(t.position.x>xb){t.position.x=xb;dir=-1;wait=rr(4,10)}else if(t.position.x<xa+nw*13.7){t.position.x=xa+nw*13.7;dir=1;wait=rr(4,10)}else if(rnd()<dt*.02){dir=-dir;wait=rr(3,8)}})}
@@ -1038,7 +1058,7 @@ function yardStart(ax,nn){const n=nn||13+(rnd()*5|0),L=n*40,np=1+(rnd()*4|0),no=
   yardPlan=Y;yards.push(Y);nextYardAbs=ax+L+rr(8000,16000);return Y}
 function yardZLin(Y,d){const k=Y.k,h=4.5*k;if(d<Y.B0||d>Y.E0)return 0;if(d<Y.B0+k*Y.Ls)return (d-Y.B0)/Y.Ls*4.5;if(d<Y.E0-k*Y.Ls)return h;return (Y.E0-d)/Y.Ls*4.5}
 function yardZAt(ab){for(const Y of yards){const d=ab-Y.a0;if(d>-15&&d<Y.L+15){let s=0;for(let q=-4;q<=4;q++)s+=yardZLin(Y,d+q*2);return s/9}}return 0}
-function yardShunter(g,G,z,xa,xb){const t=new THREE.Group();G.add(t);t.add(shunter());let x=-7.6;const room=xb-xa-30;const nw=Math.max(0,Math.min(rnd()*4|0,Math.floor(room/15)));for(let q=0;q<nw;q++){const l=wagon(t,x-6.5,0);x-=l+.9}const Lc=-x;
+function yardShunter(g,G,z,xa,xb){const t=new THREE.Group();G.add(t);regShunt(t,g);t.add(shunter());let x=-7.6;const room=xb-xa-30;const nw=Math.max(0,Math.min(rnd()*4|0,Math.floor(room/15)));for(let q=0;q<nw;q++){const l=wagon(t,x-6.5,0);x-=l+.9}const Lc=-x;
   t.position.set(rr(xa+Lc,Math.max(xa+Lc,xb-7)),0,z);let dir=pick([-1,1]),v=0,wait=rr(0,6);
   anim(g,dt=>{if(wait>0){wait-=dt;return}v=Math.min(2.4,v+dt*.4);t.position.x+=dir*v*dt;if(t.position.x>xb-7){t.position.x=xb-7;dir=-1;v=0;wait=rr(5,14)}else if(t.position.x<xa+Lc){t.position.x=xa+Lc;dir=1;v=0;wait=rr(5,14);const wx=g.position.x+t.position.x;if(Math.abs(wx)<120&&chance(.4))horn(.008,Math.max(-1,Math.min(1,wx/40)))}})}
 function yardBack(g,c,th,zf){const MX={con:.2,bir:.2};
@@ -1202,6 +1222,13 @@ function routeDraw(){if(!routeCv||routeCv.hidden||plK0===null)return;const dpr=M
   c.fillStyle='#9a968c';c.font='10px system-ui,sans-serif';c.textBaseline='top';for(const[d,t]of[[-2000,'−2 км'],[-1000,'−1 км'],[1000,'+1 км'],[2000,'+2 км']]){const x=X(odo+d);c.fillRect(x-.5,BY+BH+2,1,5);c.textAlign=d===-2000?'left':d===2000?'right':'center';c.fillText(t,x,BY+BH+8)}c.textAlign='left';
   const cx=X(odo);c.fillStyle='#f0c860';c.shadowColor='#f0c860';c.shadowBlur=6;c.fillRect(cx-1,BY-22,2,BH+24);c.shadowBlur=0;
   c.beginPath();c.moveTo(cx-11,BY+BH+2);c.lineTo(cx+5,BY+BH+2);c.lineTo(cx+11,BY+BH+7);c.lineTo(cx+11,BY+BH+10);c.lineTo(cx-11,BY+BH+10);c.closePath();c.fill()}
+// diesel purr of the nearest shunter
+let shG=null,shO=null,shP=null;const SHV=new THREE.Vector3();
+function shuntSound(dt){if(!ac)return;if(!shG){shG=ac.createGain();shG.gain.value=0;const lp=ac.createBiquadFilter();lp.type='lowpass';lp.frequency.value=240;lp.Q.value=.7;const am=ac.createGain();am.gain.value=.65;const lfo=ac.createOscillator(),lg=ac.createGain();lfo.frequency.value=11;lg.gain.value=.35;lfo.connect(lg).connect(am.gain);lfo.start();
+    shO=[ac.createOscillator(),ac.createOscillator()];shO[0].type='sawtooth';shO[1].type='square';shO[0].frequency.value=40;shO[1].frequency.value=20.3;const m2=ac.createGain();m2.gain.value=.35;shO[0].connect(lp);shO[1].connect(m2).connect(lp);shO.forEach(o=>o.start());
+    lp.connect(am);if(ac.createStereoPanner){shP=ac.createStereoPanner();am.connect(shP).connect(shG)}else am.connect(shG);shG.connect(master)}
+  let best=null,bd=1e9;for(let i=SHUNTS.length-1;i>=0;i--){const e=SHUNTS[i];let r=e.o;while(r&&r!==world)r=r.parent;if(!r){SHUNTS.splice(i,1);continue}e.o.getWorldPosition(SHV);const d=Math.hypot(SHV.x,SHV.z);if(e.px!==null)e.mv+=((Math.abs(SHV.x-e.px+speed*dt)>.004*Math.max(1,dt*60)?1:0)-e.mv)*Math.min(1,dt*2);e.px=SHV.x;if(d<bd){bd=d;best=e;best.wx=SHV.x}}
+  const t=ac.currentTime,vol=best&&bd<130?(.014+.012*best.mv)*Math.pow(1-bd/130,1.6)*(1-tun):0;shG.gain.setTargetAtTime(vol,t,.25);if(best){const f=40+best.mv*9;shO[0].frequency.setTargetAtTime(f,t,.4);shO[1].frequency.setTargetAtTime(f/2+.3,t,.4);if(shP)shP.pan.setTargetAtTime(Math.max(-1,Math.min(1,best.wx/40)),t,.2)}}
 let SHARED=null;function freeTree(root){if(!SHARED)SHARED=new Set([...Object.values(GEO),PRISM,TANK,PIPE,COOL,UMB_GEO,POOL_GEO,TPOOL_GEO,WT_SHAFT,WT_TANK,WT_RING,WT_ROOF,WT_CAP]);
   root.traverse(o=>{if(o.isInstancedMesh&&o.dispose)o.dispose();if(o.geometry&&!o.isSprite&&!SHARED.has(o.geometry))o.geometry.dispose();if(o.userData.ownMat&&o.material){if(o.material.map)o.material.map.dispose();o.material.dispose()}})}
 function dropChunk(g){world.remove(g);freeTree(g);if(annDone===g)annDone=null;if(stationRef===g&&stState==='none')stationRef=null}
@@ -1321,8 +1348,10 @@ cab(0,-1);cab(5*20.5+20,1);
 function makeCars(G,cuts){const cars=cuts.map(c=>{const k=new THREE.Group();k.position.set(c.cx,0,-3.65);k.userData.cx=c.cx;k.userData.car=1;return k});
   for(const ch of G.children.slice()){if(ch.userData.car)continue;let i=0;for(let j=0;j<cuts.length;j++)if(ch.position.x>=cuts[j].x0-.01)i=j;const k=cars[i];G.remove(ch);ch.position.x-=k.position.x;ch.position.z+=3.65;k.add(ch)}
   for(const k of cars)G.add(k);G.userData.cars=cars}
-function trackZ(tz,wx){for(const g of tz){const lx=wx-g.position.x;if(lx>=0&&lx<=CL)return g.userData.tz(lx)}return -3.65}
-function bendCars(G){const tz=chunks.filter(g=>g.userData.tz);for(const k of G.userData.cars||[]){if(!tz.length){k.position.z=-3.65;k.rotation.y=0;continue}const wx=G.position.x+k.userData.cx,a=trackZ(tz,wx-4),b=trackZ(tz,wx+4);k.position.z=(a+b)/2;k.rotation.y=-Math.atan2(b-a,8)}}
+function shiftProf(idx,x){return idx===2?-8.9:idx<2?-3.65-5.25*sstep((x+idx*40)/80):-3.65-5.25*(1-sstep((x+(idx-3)*40)/80))}
+function trackZ(tz,wx){for(const g of tz){const lx=wx-g.position.x;if(lx>=0&&lx<=CL)return g.userData.tz(lx)}
+  if(!planOff&&plK0!==null&&chunks.length){const last=chunks[chunks.length-1];if(wx>last.position.x+CL-.01){const ax=wx+odo,k=Math.floor((ax-plK0)/CL+1e-6),S=PL.get(k),e=S&&S.busy;if(e&&e.kind==='station'&&e.island&&e.k!==undefined){const idx=k-e.k,lx=ax-slotAx(k);if(idx>=0&&idx<=4)return Math.max(-8.9,Math.min(-3.65,shiftProf(idx,lx)))}}}return -3.65}
+function bendCars(G){const tz=chunks.filter(g=>g.userData.tz);for(const k of G.userData.cars||[]){const wx=G.position.x+k.userData.cx,a=trackZ(tz,wx-4),b=trackZ(tz,wx+4);k.position.z=(a+b)/2;k.rotation.y=-Math.atan2(b-a,8)}}
 makeCars(other,[0,1,2,3,4,5].map(c=>({x0:c*20.5,cx:c*20.5+10})));
 let otherStand=null,forceStandTrain=false,otherV=30,otherT=rr(60,140),otherX=0,otherHeard=false,otherG=null,otherLen=123,otherFr=false;
 const freight=new THREE.Group();freight.visible=false;outside.add(freight);const LOCOF=L({color:0x3e5a3a});
@@ -1411,7 +1440,7 @@ function frame(now){const rdt=Math.min(.05,(now-last)/1000);last=now;timeScale+=
   roomLight.intensity=.35+Math.max(nf,tun)*.55;
   // rain outside
   rainM.opacity=cur.r*.55;rainM.color.setHex(0xb0bac0).multiplyScalar(1-nf*.72*NIGHTK[SET.bright]);rain.visible=cur.r>.02&&tun<.3;if(rain.visible){const vx=-speed*.9,vy=-16;for(let i=0;i<RN;i++){const d=rainD[i];d[0]+=vx*dt;d[1]+=vy*dt;if(d[1]<0||d[0]<-22){d[0]=rr(-20,22);d[1]=rr(8,14);d[2]=rr(-2.5,-35)+yardZS}const j=i*6;rainP[j]=d[0];rainP[j+1]=d[1];rainP[j+2]=d[2];rainP[j+3]=d[0]-vx*.03;rainP[j+4]=d[1]-vy*.03;rainP[j+5]=d[2]}rainG.attributes.position.needsUpdate=true}
-  if(ac){rainSG.gain.value=cur.r*.11+cur.d*.02;rumbleG.gain.value=(.012+Math.min(1,speed/6)*.088+speed*.009)*(1+tun*.15);if(rumbleG.fl)rumbleG.fl.frequency.value=140+tun*55}
+  if(ac){rainSG.gain.value=(cur.r*.11+cur.d*.02)*(1-tun);rumbleG.gain.value=(.012+Math.min(1,speed/6)*.088+speed*.009)*(1+tun*.15);if(rumbleG.fl)rumbleG.fl.frequency.value=140+tun*55}
   // leaves
   leafGustT-=dt;if(leafGustT<=0){leafGust=leafGust>0?0:rr(.5,1);leafGustT=leafGust?rr(7,16):rr(6,22)}
   const lf=Math.max(0,Math.min(1,(cur.r-.55)/.35))*leafGust;
@@ -1445,16 +1474,17 @@ function frame(now){const rdt=Math.min(.05,(now-last)/1000);last=now;timeScale+=
   flockT-=dt;if(!flock&&flockT<=0){if(night<.35)flock=birdFlock();else flockT=rr(20,40)}
   if(flock){flock.position.x+=(flock.userData.vx-speed)*dt;for(const b of flock.userData.birds){const w=Math.sin(T*9+b.userData.ph);b.material=BIRDF[w>.35?0:w<-.35?2:1];b.position.y+=Math.sin(T*.7+b.userData.ph)*.01}if(flock.position.x<-260){outside.remove(flock);flock=null;flockT=rr(18,55)}}
   otherT-=dt;if(otherT<=0&&!otherG&&!yardPlan&&!yards.some(y=>odo>y.a0-900&&odo<y.a1+60)){if(chance(.35)){otherLen=buildFreight();otherG=freight;otherFr=true;otherV=speed<3?rr(6,11):rr(11,22)}else{otherG=other;otherLen=123;otherFr=false;otherV=speed<3?rr(8,16):rr(16,34)}otherG.visible=true;otherX=380;otherHeard=false;otherNear=false}
-  if(stationRef&&stState==='coming'&&!otherG&&stationRef.userData.stz&&!stationRef.userData.standTried&&stationRef.position.x<330){stationRef.userData.standTried=1;if(forceStandTrain||chance(.35)){forceStandTrain=false;otherG=other;other.visible=true;otherLen=123;otherFr=false;otherV=0;otherHeard=otherNear=true;otherX=stationRef.position.x+20-61.5;otherStand={g:stationRef,ph:'wait',t:0,n:0,brd:[]}}}
-  if(otherStand){const S=otherStand,g=S.g,pl=g.userData.plat,PT=g.userData.PT||1;otherX=g.position.x+20-61.5;
+  if(stationRef&&stState==='coming'&&!otherG&&stationRef.userData.stz&&!stationRef.userData.standTried&&stationRef.position.x<330){stationRef.userData.standTried=1;if(forceStandTrain||chance(.35)){forceStandTrain=false;otherG=other;other.visible=true;otherLen=123;otherFr=false;otherV=0;otherHeard=otherNear=true;otherX=stationRef.position.x+(stationRef.userData.plat?stationRef.userData.plat[0]-1:0);otherStand={g:stationRef,ph:'wait',t:0,n:0,brd:[]}}}
+  if(otherStand){const S=otherStand,g=S.g,pl=g.userData.plat,PT=g.userData.PT||1;const hx=g.position.x+(pl?pl[0]-1:0);otherX=hx;
     if(!g.parent){otherStand=null}
     else if(S.ph==='wait'){if(stState==='stopped'){S.ph='alight';S.t=rr(5,8);S.n=2+(rnd()*5|0);S.k=0;if(chance(.55))makeWorker(g,rr(pl[0]+2,pl[1]-2),pl[3]+.45,PT,{xa:pl[0]+1,xb:pl[1]-1,face:0,lit:true})}}
-    else if(S.ph==='alight'){S.t-=dt;S.k-=dt;if(S.n>0&&S.k<=0){S.k=rr(.4,1.3);S.n--;const dl=DOORX.map(d=>otherX+d-g.position.x).filter(x=>x>pl[0]+.6&&x<pl[1]-.6),x=dl.length?pick(dl)+rr(-.2,.2):rr(pl[0]+1.5,pl[1]-1.5),p=makePerson(g,x,pl[3]-.2,0,PT),pp=g.userData.people,q=pp[pp.length-1];litPerson(p);q.leave=true;q.exitX=nearExit(g,x);q.v=Math.sign(q.exitX-x||1)*rr(.9,1.2);q.beh=false}
-      if(S.t<=0&&S.n<=0){S.ph='board';S.t=0;const ppl=g.userData.people||[];const c=ppl.filter(q=>q.beh&&!q.mate&&!q.seller&&!q.hobo&&!q.tour&&!q.run&&!q.leave&&!q.wk&&!(q.go&&q.go.buy)).sort(()=>rnd()-.5).slice(0,1+(rnd()*4|0));
+    else if(S.ph==='alight'){S.t-=dt;S.k-=dt;if(S.n>0&&S.k<=0){S.k=rr(1.3,2.6);const ppl=g.userData.people||[],dl=DOORX.map(d=>otherX+d-g.position.x).filter(x=>x>pl[0]+.6&&x<pl[1]-.6&&!ppl.some(o=>Math.hypot(o.p.position.x-x,o.p.position.z-(pl[3]-.15))<1.1));if(dl.length){S.n--;const x=pick(dl),p=makePerson(g,x,pl[3]-.15,0,PT),pp=g.userData.people,q=pp[pp.length-1];litPerson(p);q.beh=false;q.alight=alightTarget(g,q,x)}else S.k=.4}
+      if(S.t<=0&&S.n<=0&&(g.userData.people||[]).some(q=>q.alight))S.t=.3;
+      if(S.t<=0&&S.n<=0){S.ph='board';S.t=0;const ppl=g.userData.people||[];const c=ppl.filter(q=>q.beh&&!q.arrived&&!q.mate&&!q.seller&&!q.hobo&&!q.tour&&!q.run&&!q.leave&&!q.wk&&!(q.go&&q.go.buy)).sort(()=>rnd()-.5).slice(0,1+(rnd()*4|0));
         for(const q of c){if(q.seat){q.seat.used=null;q.seat=null}q.go=null;q.v=0;q.beh=false;{const dl=DOORX.map(d=>otherX+d-g.position.x).filter(x=>x>pl[0]+.6&&x<pl[1]-.6);let tx=Math.max(pl[0]+1,Math.min(pl[1]-1,q.p.position.x+rr(-3,3)));if(dl.length)tx=dl.reduce((a,b)=>Math.abs(b-q.p.position.x)<Math.abs(a-q.p.position.x)?b:a);q.brd={x:tx,z:pl[3]-.35}}q.p.position.y=q.y0;S.brd.push(q)}}}
     else if(S.ph==='board'){S.t+=dt;const ppl=g.userData.people||[];if((S.brd.every(q=>!ppl.includes(q))&&S.t>3)||S.t>25){for(const q of S.brd)if(ppl.includes(q)){g.remove(q.p);ppl.splice(ppl.indexOf(q),1)}S.ph='close';S.t=2.5}}
     else if(S.ph==='close'){S.t-=dt;if(S.t<=0){S.ph='go';horn(.02,Math.max(-1,Math.min(1,(otherX+60)/40)));stopFull=rr(5,9);stopT=Math.min(stopT,stopFull)}}
-    if(S.ph==='go'){otherV=Math.min(16,otherV+.45*dt);otherX=g.position.x+20-61.5-(S.dx=(S.dx||0)+otherV*dt)}
+    if(S.ph==='go'){otherV=Math.min(16,otherV+.45*dt);otherX=hx-(S.dx=(S.dx||0)+otherV*dt)}
     other.position.x=otherX;bendCars(other);if(S.ph==='go'&&otherX+otherLen<-60)otherStand=null}
   if(otherG&&!otherStand){otherX-=(speed+otherV)*dt;otherG.position.x=otherX;bendCars(otherG);if(!otherNear&&otherX<108){otherNear=true;approachSnd(Math.max(.5,(otherX-45)/(speed+otherV)),otherFr)}if(!otherHeard&&otherX<45){otherHeard=true;if(otherFr)freightSnd(Math.min(150,(otherLen+70)/(speed+otherV)+1.5));else whoosh((otherLen+70)/(speed+otherV)+1.2)}if(otherX<-400-otherLen){otherG.visible=false;otherG=null;otherT=rr(70,160)}}
   else if(otherG&&otherStand)other.visible=true;
@@ -1465,7 +1495,7 @@ function frame(now){const rdt=Math.min(.05,(now-last)/1000);last=now;timeScale+=
   const bob=moving?Math.sin(T*9)*.012:0,sw=Math.min(1,speed/8),cx=pose.x+Math.sin(T*1.3)*.004*sw,cy=1.4+pose.y+Math.sin(T*2.1)*.003*sw+bump*(rnd()-.3)+bob;
   camera.position.set(cx,cy,pose.z);camera.lookAt(cx+Math.cos(pose.a)*Math.cos(pose.p),cy+Math.sin(pose.p),pose.z+Math.sin(pose.a)*Math.cos(pose.p));
   const flip=pose.z>CZ+.05,fz=flip?-1:1,cz0=flip?WZ+OZ:0;{const a=yardZAt(odo-1.5),b=yardZAt(odo+1.5);yardZS=(a+b)/2;yardPhi=Math.atan2(b-a,3)}outside.scale.z=fz;outside.rotation.y=fz*yardPhi;outside.position.x=-fz*yardZS*Math.sin(fz*yardPhi);outside.position.z=cz0-fz*yardZS*Math.cos(fz*yardPhi);
-  routeT-=rdt;if(routeT<=0){routeT=.12;routeDraw()}
+  routeT-=rdt;if(routeT<=0){routeT=.12;routeDraw()}shuntSound(Math.max(dt,1e-4));
   drawView();requestAnimationFrame(frame)}
 requestAnimationFrame(frame);
 })();
