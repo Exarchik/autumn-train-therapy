@@ -11794,6 +11794,7 @@
     }, extra || {});
   }
   // ---------- route strip: 2 km behind, 2 km ahead ----------
+  const TIME_DAY_SCALE = 2; // day/night band under the strip: minutes of real time shown to each side of "now" (left edge = −N min, right edge = +N min)
   const BCOL = {
     forest: '#2f5a34',
     birch: '#93a052',
@@ -11821,7 +11822,7 @@
     yard: 'стоянка'
   };
   let routeT = 0;
-  // day/night along the strip: the past is recorded where it switched, the future is predicted from the queued durations and the average speed
+  // day/night band under the strip: its own time scale, TIME_DAY_SCALE minutes back to TIME_DAY_SCALE minutes ahead; the past is recorded, the future comes from the queued durations
   /**
    * F488 — Повертає тривалість дня або ночі з черги Q, за потреби доповнюючи її до індексу i.
    * Параметри: Q; i.
@@ -11830,38 +11831,42 @@
     while (Q.length <= i) Q.push(Q === NQ ? rr(70, 160) : rr(180, 440));
     return Q[i];
   }
+  const DN_SPAN = TIME_DAY_SCALE * 60; // the same span in seconds
   /**
-   * F489 — Прогнозує точки зміни дня й ночі до відстані hi за середньою швидкістю.
-   * Параметри: hi.
+   * F489 — Повертає моменти зміни дня й ночі (у часі гри T): записані в минулому і передбачені на span секунд уперед.
+   * Кожен запис має n (1 — настає ніч) і l — рівень затемнення в момент зміни.
+   * Параметри: span.
    */
-  function dnSwitches(hi) {
+  function dnSwitches(span) {
     const out = DNH.slice();
-    const v = Math.max(5, vAvg);
     let s = nightTarget;
     let t = nightT;
+    let l = s + (night - s) * Math.exp(-.04 * nightT);
     let di = 0;
     let ni = 0;
-    while (odo + t * v < hi && out.length < 40) {
+    while (t < span && out.length < 40) {
       s = s ? 0 : 1;
       out.push({
-        ax: odo + t * v,
-        n: s
+        t: T + t,
+        n: s,
+        l
       });
-      t += s ? dnRaw(NQ, ni++) * NIGHTF[SET.night] : dnRaw(DQ, di++) * DAYF[SET.day];
+      const len = s ? dnRaw(NQ, ni++) * NIGHTF[SET.night] : dnRaw(DQ, di++) * DAYF[SET.day];
+      l = s + (l - s) * Math.exp(-.04 * len);
+      t += len;
     }
     return out;
   }
   /**
-   * F490 — Оцінює рівень нічного затемнення в точці ax за списком переходів sw.
-   * Параметри: sw; ax.
+   * F490 — Оцінює рівень нічного затемнення в момент часу tau за списком переходів sw (так само, як його рахує гра).
+   * Параметри: sw; tau.
    */
-  function dnLevel(sw, ax) {
-    const v = Math.max(5, vAvg);
+  function dnLevel(sw, tau) {
     let i = sw.length - 1;
-    while (i > 0 && sw[i].ax > ax) i--;
+    while (i > 0 && sw[i].t > tau) i--;
     const a = sw[i];
-    const dt = (ax - a.ax) / v;
-    return a.n + (1 - a.n - a.n) * Math.exp(-.04 * Math.max(0, dt));
+    const k = a.n + (a.l - a.n) * Math.exp(-.04 * Math.max(0, tau - a.t));
+    return k * k * (3 - 2 * k);
   }
   /**
    * F491 — Малює схему маршруту: місцевості, події, поточну позицію та зміну дня/ночі.
@@ -11947,14 +11952,15 @@
       }
     }
     {
-      const sw = dnSwitches(hi);
+      const sw = dnSwitches(DN_SPAN);
+      const TX = tau => m + (W - 2 * m) * ((tau - T) / (2 * DN_SPAN) + .5);
       const y = BY + BH + (small ? 1 : 1.5);
       const h = small ? 3 : 4;
       const D = [236, 214, 140];
       const N = [78, 104, 184];
       for (let px = m; px < W - m; px += 2) {
-        const ax = odo + ((px - m) / (W - 2 * m) - .5) * 4000;
-        const l = dnLevel(sw, ax);
+        const tau = T + ((px - m) / (W - 2 * m) - .5) * 2 * DN_SPAN;
+        const l = dnLevel(sw, tau);
         c.fillStyle = `rgb(${D[0] + (N[0] - D[0]) * l | 0},${D[1] + (N[1] - D[1]) * l | 0},${D[2] + (N[2] - D[2]) * l | 0})`;
         c.fillRect(px, y, 2.2, h);
       }
@@ -11962,7 +11968,7 @@
         c.font = '9px system-ui,sans-serif';
         c.textBaseline = 'middle';
         for (let q = 1; q < sw.length; q++) {
-          const x = X(sw[q].ax + Math.max(5, vAvg) * 15);
+          const x = TX(sw[q].t + 15);
           if (x < m + 4 || x > W - m - 4) continue;
           c.save();
           c.translate(x, y + h / 2);
@@ -12789,10 +12795,10 @@
   let DQ = [];
   let NQ = [];
   let DNH = [{
-    ax: -1e9,
-    n: 0
+    t: -1e9,
+    n: 0,
+    l: 0
   }];
-  let vAvg = 20;
   let fogMul = 1;
   let fogMulT = 1;
   let fogMulTimer = rr(15, 35);
@@ -13912,13 +13918,13 @@
       nightT = nightTarget ? dnRaw(NQ, 0) * NIGHTF[SET.night] : dnRaw(DQ, 0) * DAYF[SET.day];
       (nightTarget ? NQ : DQ).shift();
       DNH.push({
-        ax: odo,
-        n: nightTarget
+        t: T,
+        n: nightTarget,
+        l: night
       });
-      while (DNH.length > 2 && DNH[1].ax < odo - 3000) DNH.shift();
+      while (DNH.length > 2 && DNH[1].t < T - DN_SPAN - 60) DNH.shift();
     }
     night += (nightTarget - night) * dt * .04;
-    vAvg += (speed - vAvg) * Math.min(1, dt / 90);
     const nf = night * night * (3 - 2 * night);
     {
       let tt = 0;
