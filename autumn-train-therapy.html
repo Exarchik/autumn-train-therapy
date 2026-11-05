@@ -531,7 +531,7 @@
 () => {
   /* ---------- switches ---------- */
   const MENU_ENABLED = true; // single click / tap opens the side menu (stereo mode etc.)
-  const TEST_TOOLS = true; // NumPad test keys: + station, − island, 4 island with train, 7 yard, 8 tunnel, 9 oncoming train
+  const TEST_TOOLS = true; // NumPad test keys: + station, − island, 4 island with train, 6 split truss bridge over the sea, 7 yard, 8 tunnel, 9 oncoming train
   const STEREO_EYE = .064; // distance between the two stereo cameras, metres (average human eye distance)
   const STEREO_SIDE = 1; // where the second (right-half) camera sits: 1 = to the right (correct for VR glasses), -1 = to the left (cross-eyed viewing)
   const LENS_K1 = .22;
@@ -8738,7 +8738,7 @@
         } else if (ok && !roadNear(ax + 60, 110)) {
           ev.started = true;
           if (ev.kind === 'big') {
-            bigStart(g, ev.n);
+            bigStart(g, ev.n, ev.top);
             return;
           }
           if (ev.kind === 'tunnel') {
@@ -8752,6 +8752,11 @@
       }
     }
     if (planOff && stState === 'none' && !stationBuild && !valley && !g.userData.sid && g.userData.ax > nextBridgeAbs && g.userData.ax - lastLakeAbs > 500 && !roadNear(g.userData.ax + 60, 110) && !(chunks.length && chunks[chunks.length - 1].userData.road)) {
+      if (forceBig) {
+        forceBig = false;
+        bigStart(g, 0, 'truss');
+        return;
+      }
       if ((biome === 'field' || biome === 'forest' || biome === 'birch') && chance(.3)) {
         const k = bigOrTun(g, biome) || pick(['river', 'river', 'road', 'rail']);
         if (k === 'big') {
@@ -9268,12 +9273,12 @@
     if (!g.userData.station) {
       if (!g.userData.vpart) details(g, biome, c, MIX);
       if (roads.length) clearRoads(g, c);
-    }
+    } else if (!stShift && night < .35 && chance(.45)) crows(g);
     if (g.userData.wt && (biome === 'field' || biome === 'cityforest')) {
       const x = rr(9, 31);
       const z = biome === 'field' ? rr(-45, -85) : rr(-126, -136);
       if (g.userData.station || g.userData.vpart || g.userData.river || roadNear(g.userData.ax + x, 25) || roadHit(g, x, z, 14)) wtPostpone();else wtAt(g, x, z, true);
-    } else if (g.userData.wt && (biome === 'village' || biome === 'pgt') && !g.userData.wtDone) wtPostpone(); else if (!stShift && night < .35 && chance(.45)) crows(g);
+    } else if (g.userData.wt && (biome === 'village' || biome === 'pgt') && !g.userData.wtDone) wtPostpone();
     if (g.userData.sidLim) sidClear(g, c);
     if (g.userData.post) for (const f of g.userData.post) f(c);
     if (['industrial', 'depot'].includes(biome) || g.userData.yard) {
@@ -9547,6 +9552,7 @@
    */
   function bigY(V, d, z) {
     let k = Math.min(d, V.n * 40 - d);
+    if (V.split) k = Math.max(0, k - V.split.land);
     if (z !== undefined && z < -14) {
       const r = ease(Math.min(1, (-z - 14) / 30));
       const f = d < V.n * 20 ? V.ph : V.ph + 2.7;
@@ -9554,12 +9560,30 @@
     }
     return -19 * ease(Math.max(0, Math.min(1, k / 120)));
   }
+  // truss bridges over the sea are two single-track bridges: 250 m before the bridge our track swings 20-30 m away from the
+  // oncoming one, each crosses on its own bridge (arches only over the water), and after the far bank our track swings back over 250 m
+  const SPLIT_RAMP = 250; // length of each swing, m
+  const SPLIT_M = 10; // flat land before the swing starts, m
+  const SPLIT_EXTRA = 14; // extra 40 m parts a split bridge needs for the land at both ends
+  let splits = [];
+  let forceBig = false; // test key NumPad 6 without the route plan
   /**
-   * F372 — Починає великий міст завдовжки nn відрізків або випадкової довжини.
-   * Параметри: g; nn.
+   * F371a — Бічний зсув нашої колії від колії зустрічного потяга в точці d великого мосту (0 поза розведенням).
+   * Параметри: V — опис мосту або запис splits; d — відстань від початку мосту, м.
    */
-  function bigStart(g, nn) {
-    const n = nn || 10 + (rnd() * 11 | 0);
+  function splitOff(V, d) {
+    const sp = V.split || V;
+    const L = sp.L;
+    const u = Math.max(0, Math.min(1, (d - SPLIT_M) / SPLIT_RAMP, (L - SPLIT_M - d) / SPLIT_RAMP));
+    return sp.D * u * u * u * (u * (u * 6 - 15) + 10);
+  }
+  /**
+   * F372 — Починає великий міст завдовжки nn відрізків або випадкової довжини; top — тип ('truss' або 'cable').
+   * Параметри: g; nn; top.
+   */
+  function bigStart(g, nn, top) {
+    top = top || (chance(.5) ? 'truss' : 'cable');
+    const n = nn || 10 + (rnd() * 11 | 0) + (top === 'truss' ? SPLIT_EXTRA : 0);
     markAct(g.userData.ax, 'big', {
       n
     });
@@ -9574,10 +9598,19 @@
       n,
       py,
       ph: rr(0, 6.3),
-      top: chance(.5) ? 'truss' : 'cable',
+      top,
       part: 0,
       biome: g.userData.biome
     };
+    if (top === 'truss') {
+      valley.split = {
+        a0: g.userData.ax,
+        L: n * 40,
+        D: rr(20, 30),
+        land: SPLIT_M + SPLIT_RAMP + 15
+      };
+      splits.push(valley.split);
+    }
     roads.push({
       ax: g.userData.ax + n * 20,
       ang: 0,
@@ -9587,6 +9620,121 @@
     nextBigAbs = g.userData.ax + rr(7000, 14000);
     nextBridgeAbs = g.userData.ax + n * 40 + rr(1200, 2400);
     bigPart(g);
+  }
+  /**
+   * F373a — Чи стоїть у частині d0 вже міст (рельєф під коліями опускається), а не насип на березі.
+   * Параметри: V; d0.
+   */
+  function splitDeck(V, d0) {
+    return Math.min(bigY(V, d0), bigY(V, d0 + 40)) < -1.5;
+  }
+  /**
+   * F373a2 — Чи вся частина d0 над водою: лише тут над мостами стоять балкові арки.
+   * Параметри: V; d0.
+   */
+  function splitWater(V, d0) {
+    return Math.max(bigY(V, d0), bigY(V, d0 + 40)) < -15.3;
+  }
+  /**
+   * F373b — Додає в sg сегменти одноколійної балкової ферми вздовж відрізка між z = zc − 2.7 і zc + 2.7.
+   * Параметри: sg; zc.
+   */
+  function splitTruss(sg, zc) {
+    const TH = k => .7 + 6.4 + 3.4 * Math.sin(Math.PI * k / 8);
+    const zs = [zc - 2.7, zc + 2.7];
+    for (const z of zs) {
+      sg.push([0, .75, z, 40, .75, z, .5]);
+      sg.push([.5, .75, z, 5, TH(1), z, .5], [35, TH(7), z, 39.5, .75, z, .5]);
+      for (let k = 1; k < 7; k++) sg.push([k * 5, TH(k), z, k * 5 + 5, TH(k + 1), z, .5]);
+      for (let k = 1; k <= 7; k++) sg.push([k * 5, .75, z, k * 5, TH(k), z, .3]);
+      for (let k = 1; k < 7; k++) sg.push(k < 4 ? [k * 5, TH(k), z, k * 5 + 5, .75, z, .28] : [k * 5, .75, z, k * 5 + 5, TH(k + 1), z, .28]);
+    }
+    for (let k = 1; k <= 7; k++) sg.push([k * 5, TH(k), zs[0], k * 5, TH(k), zs[1], .22]);
+    for (let k = 1; k < 7; k++) sg.push([k * 5, TH(k), zs[0], k * 5 + 5, TH(k + 1), zs[1], .16], [k * 5, TH(k), zs[1], k * 5 + 5, TH(k + 1), zs[0], .16]);
+  }
+  const SLOPEM = new THREE.MeshLambertMaterial({
+    map: tGravel,
+    side: THREE.DoubleSide
+  });
+  /**
+   * F373c — Частина розведеного мосту: на березі — наша колія на власному насипу, що відходить чи повертається;
+   * над водою — два окремі одноколійні балкові мости (зустрічний на z = −3.65, наш — на зсуві D).
+   * Параметри: V; G; g; d0; y0; y1; last.
+   */
+  function splitPart(V, G, g, d0, y0, y1, last) {
+    const SP = V.split;
+    const zo = ZL(0);
+    const deck = splitDeck(V, d0);
+    const water = splitWater(V, d0);
+    const pts = [];
+    for (let x = 0; x <= 40.01; x += 2) pts.push([x, splitOff(SP, d0 + x), .8]);
+    if (!deck) {
+      // land: our track on its own embankment; the near edge of the oncoming embankment gets a slope
+      trackAlong(G, pts, true, false);
+      const v = [];
+      for (let x = 0; x < 40; x += 4) v.push(x, .8, -1, x + 4, .8, -1, x + 4, -.05, 1.6, x, .8, -1, x + 4, -.05, 1.6, x, -.05, 1.6);
+      const sg2 = new THREE.BufferGeometry();
+      sg2.setAttribute('position', new THREE.Float32BufferAttribute(v, 3));
+      sg2.computeVertexNormals();
+      G.add(new THREE.Mesh(sg2, SLOPEM));
+      // trees and bushes on the ground between the two tracks, never reaching over either of them
+      (g.userData.post || (g.userData.post = [])).push(c => {
+        const zMin = 2.6; // beyond the foot of the oncoming embankment
+        for (let x = rr(0, 3); x < 40; x += rr(2.5, 5.5)) {
+          const zMax = splitOff(SP, d0 + x) - 3.4; // our embankment plus the side of our train
+          if (zMax - zMin < 2) continue;
+          if (chance(.45) && zMax - zMin > 6) {
+            const h = rr(5, Math.min(11, 4 + (zMax - zMin) * .8));
+            const r = h * .32;
+            if (zMax - zMin > 2 * r + .5) tree(c, x, rr(zMin + r, zMax - r), h, {
+              con: .15,
+              bir: .35
+            });
+          } else {
+            const r = rr(.8, Math.min(1.6, (zMax - zMin) / 2 - .2));
+            if (r > .6) indBush(c, x, rr(zMin + r, zMax - r), r);
+          }
+        }
+      });
+      return;
+    }
+    // two single-track bridges: piers and decks over the falling bank, truss arches only over the water
+    if (water) for (const ch of g.children.slice()) {
+      if (ch !== G && ch.userData.keep && !ch.userData.ground && ch.position.x < 3.2 && ch.position.z < -3.2 && ch.position.z > -7.1) g.remove(ch);
+    }
+    const D = SP.D;
+    for (const zc of [zo, D]) {
+      for (const [px, py] of last ? [[0, y0], [40, y1]] : [[0, y0]]) {
+        if (py > -1) continue;
+        addBox(G, STONEM, px, py - 1, zc, 4.2, -py + 1 - .55 - 1.2, 7);
+        addBox(G, CONC, px, -1.75, zc, 5, 1.2, 7.6);
+        if (py < -15.2) for (const z of [zc - 3.9, zc + 3.9]) {
+          const cw = new THREE.Mesh(GEO.box, STONEM);
+          cw.scale.set(3.4, -12.5 - py, 3.4);
+          cw.position.set(px, py, z);
+          cw.rotation.y = Math.PI / 4;
+          G.add(cw);
+        }
+      }
+    }
+    if (water) {
+      const sg = [];
+      splitTruss(sg, zo);
+      splitTruss(sg, D);
+      segInst(G, TRUSSM, sg);
+    } else for (const zc of [zo, D]) for (const s of [-1, 1]) {
+      // plain deck girders with a low railing where there are no arches
+      addBox(G, CONC, 20, -.3, zc + s * 2.75, 40, 1.15, .35);
+      const po = [];
+      for (let x = .5; x < 40; x += 2) po.push([x, .85, zc + s * 2.75, .06, .9, .06]);
+      G.add(inst(GEO.box, MAT.metal, po));
+      addBox(G, MAT.metal, 20, 1.72, zc + s * 2.75, 40, .06, .07);
+    }
+    // our deck and track, and a girder along the near edge of the oncoming deck
+    addBox(G, STONEM, 20, .25, D, 40, .55, 5.4);
+    addBox(G, CONC, 20, -.55, D, 40, .8, 5);
+    trackAlong(G, pts, false, false);
+    addBox(G, CONC, 20, -.55, -.75, 40, 1.4, .6);
   }
   /**
    * F374 — Будує наступну частину великого мосту з опорами, долиною, водою й суднами.
@@ -9599,7 +9747,9 @@
     const last = part === V.n - 1;
     g.userData.river = 1;
     g.userData.vpart = 1;
-    const geo = new THREE.PlaneGeometry(40, 520, 20, 104).rotateX(-Math.PI / 2).translate(20, 0, -266);
+    const SP = V.split;
+    const ext = SP ? 46 : 0; // split bridges: terrain and water also between the two bridges, up to z = +40
+    const geo = new THREE.PlaneGeometry(40, 520 + ext, 20, 104 + (ext / 5 | 0)).rotateX(-Math.PI / 2).translate(20, 0, -266 + ext / 2);
     const p = geo.attributes.position;
     for (let i = 0; i < p.count; i++) p.setY(i, bigY(V, d0 + p.getX(i), p.getZ(i)));
     geo.computeVertexNormals();
@@ -9626,7 +9776,7 @@
      * Параметри: z.
      */
     z => Math.min(bigY(V, d0, z), bigY(V, d0 + 40, z)) < -15.3)) {
-      const w = new THREE.Mesh(new THREE.PlaneGeometry(40, 520).rotateX(-Math.PI / 2).translate(20, 0, -266), RIVW);
+      const w = new THREE.Mesh(new THREE.PlaneGeometry(40, 520 + ext).rotateX(-Math.PI / 2).translate(20, 0, -266 + ext / 2), RIVW);
       w.position.y = -15.5;
       G.add(w);
     }
@@ -9671,6 +9821,8 @@
         }
       }
       addBox(G, STONEM, 20, -1.5, -7.55, 40, .55, 3.9);
+    } else if (SP) {
+      splitPart(V, G, g, d0, y0, y1, last);
     } else {
       for (const [px, py] of last ? [[0, y0], [40, y1]] : [[0, y0]]) {
         if (py > -1) continue;
@@ -9707,6 +9859,7 @@
       segInst(G, TRUSSM, sg);
     }
     // deck: thin slab under the other track, the outer girder, walkway railing and lamps
+    if (!SP || splitDeck(V, d0)) {
     addBox(G, STONEM, 20, .25, -4.05, 40, .45, 3.7);
     addBox(G, CONC, 20, -.55, -7.55, 40, 1.4, 3.3);
     addBox(G, MAT.dark, 20, .85, -5.95, 40, .14, .25);
@@ -9718,6 +9871,7 @@
       addBox(G, MAT.metal, 20, 1.35, -9.05, 40, .04, .05);
     }
     addBox(G, BRDG, 20, -.45, -10.05, 40, 1.1, 1.7);
+    }
     for (const lx of V.top === 'truss' ? [] : [6.7, 20, 33.3]) {
       addBox(G, MAT.metal, lx, .85, -9.3, .14, 6, .14);
       addBox(G, MAT.metal, lx, 6.75, -8.75, .1, .1, 1.2);
@@ -9871,7 +10025,7 @@
       });
     }
     // rarely someone on the walkway
-    if (chance(.14)) {
+    if ((!SP || splitDeck(V, d0)) && chance(.14)) {
       const n = 1 + (chance(.3) ? 1 : 0);
       for (let k = 0; k < n; k++) {
         const st = chance(.45);
@@ -10447,6 +10601,14 @@
    * Параметри: ab.
    */
   function yardZAt(ab) {
+    for (const S of splits) {
+      const d = ab - S.a0;
+      if (d > -15 && d < S.L + 15) {
+        let s = 0;
+        for (let q = -4; q <= 4; q++) s += splitOff(S, d + q * 2);
+        return s / 9;
+      }
+    }
     for (const Y of yards) {
       const d = ab - Y.a0;
       if (d > -15 && d < Y.L + 15) {
@@ -11591,7 +11753,10 @@
         n: Math.ceil((p0 + L + 22) / 40),
         b: ['forest', 'birch'].includes(S.b) ? S.b : 'forest'
       });
-    } else if (kind === 'big') e.n = 10 + (rnd() * 11 | 0);else if (kind === 'river' || kind === 'road' || kind === 'rail') e.n = 3;else if (kind === 'yard') {
+    } else if (kind === 'big') {
+      e.top = o.top || (chance(.5) ? 'truss' : 'cable');
+      e.n = 10 + (rnd() * 11 | 0) + (e.top === 'truss' ? SPLIT_EXTRA : 0);
+    } else if (kind === 'river' || kind === 'road' || kind === 'rail') e.n = 3;else if (kind === 'yard') {
       e.n = 13 + (rnd() * 5 | 0);
       e.b = 'yard';
     } else if (kind === 'siding') {
@@ -13456,7 +13621,7 @@
    * Параметри: e.
    */
   e => {
-    if (!TEST_TOOLS && /^Numpad(Subtract|Add|4|7|8|9)$/.test(e.code)) return;
+    if (!TEST_TOOLS && /^Numpad(Subtract|Add|4|6|7|8|9)$/.test(e.code)) return;
     if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Space'].includes(e.code)) e.preventDefault();
     if (e.code === 'KeyE' && !e.repeat) {
       toggleSeat();
@@ -13523,6 +13688,20 @@
       y => odo > y.a0 - 900 && odo < y.a1 + 60)) toast('Тест: на стоянці зустрічні не ходять');else {
         otherT = 0;
         toast('Тест: запускаю зустрічний потяг…');
+      }
+      return;
+    }
+    if (e.code === 'Numpad6' && !e.repeat) {
+      if (valley && valley.kind === 'big' || forceBig) toast('Тест: великий міст уже попереду');else if (!planOff) {
+        insertEvent('big', {
+          top: 'truss'
+        });
+        toast('Тест: розведені мости через море попереду');
+      } else {
+        forceBig = true;
+        nextBridgeAbs = 0;
+        lastLakeAbs = -1e9;
+        toast('Тест: створюю розведені мости…');
       }
       return;
     }
@@ -13796,6 +13975,7 @@
       }
       yardPrev = speed;
       if (yards.length && yards[0].a1 < odo - 700) yards.shift();
+      if (splits.length && splits[0].a0 + splits[0].L < odo - 700) splits.shift();
     }
     // move the world
     {
