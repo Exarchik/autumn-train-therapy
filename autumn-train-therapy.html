@@ -1,4 +1,3 @@
-<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
 <!doctype html>
 <!--
   AUTUMN TRAIN THERAPY — версія для редагування.
@@ -5006,57 +5005,272 @@
     addBox(g, MAT.dark, 0, 0, 9.81, 1.4, 2.6, .06);
     for (const sd of [-1, 1]) for (let k = 0; k < 3; k++) addBox(g, MAT.dark, sd * 4.01, 3, -3.5 + k * 3.5, .06, 2, .7);
   }
-  const WT_SHAFT = new THREE.CylinderGeometry(2.3, 2.7, 13, 8).translate(0, 6.5, 0);
-  const WT_TANK = new THREE.CylinderGeometry(3.6, 3.3, 4.6, 8).translate(0, 2.3, 0);
-  const WT_RING = new THREE.CylinderGeometry(3.75, 3.75, .45, 8).translate(0, .22, 0);
-  const WT_ROOF = new THREE.ConeGeometry(4.1, 2.6, 8).translate(0, 1.3, 0);
-  const WT_CAP = new THREE.ConeGeometry(.5, 1.1, 8).translate(0, .55, 0);
-  const WTW = L({
-    color: 0x8a8478
-  });
+  // ---- water towers: three types after reference photos (concrete with a steel tank, round brick, slim blue steel) ----
   /**
-   * F208 — Створює водонапірну башту з баком, дахом і деталями.
+   * F207a — Переписує UV циліндра в метрах, щоб текстура не розтягувалась на високих і широких частинах.
+   * Параметри: geo; r — радіус; h — висота; tile — розмір плитки текстури, м.
+   */
+  function cylUV(geo, r, h, tile) {
+    const uv = geo.attributes.uv;
+    for (let i = 0; i < uv.count; i++) uv.setXY(i, uv.getX(i) * Math.PI * 2 * r / tile, uv.getY(i) * h / tile);
+    return geo;
+  }
+  const cylG = (r0, r1, h, y0, n = 12, tile = 4, open = false) => cylUV(new THREE.CylinderGeometry(r0, r1, h, n, 1, open).translate(0, y0 + h / 2, 0), Math.max(r0, r1), h, tile);
+  const WT_CONC = L({
+    map: ctex(32, 32,
+    /**
+     * F207b — Малює вивітрений бетон із потьоками та іржею.
+     * Параметри: g.
+     */
+    g => {
+      g.fillStyle = '#8c8a84';
+      g.fillRect(0, 0, 32, 32);
+      for (let i = 0; i < 140; i++) {
+        g.fillStyle = pick(['rgba(0,0,0,.06)', 'rgba(255,255,255,.05)', 'rgba(90,70,50,.07)']);
+        g.fillRect(rnd() * 32 | 0, rnd() * 32 | 0, 2, 1);
+      }
+      for (let i = 0; i < 7; i++) {
+        g.fillStyle = pick(['rgba(50,48,44,.22)', 'rgba(110,70,40,.22)', 'rgba(40,38,36,.16)']);
+        g.fillRect(rnd() * 32 | 0, rnd() * 10 | 0, 1 + (rnd() * 2 | 0), rr(8, 30) | 0);
+      }
+    })
+  });
+  const WT_STEEL = L({
+    map: ctex(32, 32,
+    /**
+     * F207c — Малює старий сталевий бак із шовними поясами та рудими патьоками.
+     * Параметри: g.
+     */
+    g => {
+      g.fillStyle = '#6e6c66';
+      g.fillRect(0, 0, 32, 32);
+      g.fillStyle = 'rgba(0,0,0,.18)';
+      g.fillRect(0, 15, 32, 1);
+      g.fillRect(0, 31, 32, 1);
+      for (let i = 0; i < 9; i++) {
+        g.fillStyle = pick(['rgba(120,70,36,.35)', 'rgba(90,50,30,.3)', 'rgba(40,38,34,.25)']);
+        g.fillRect(rnd() * 32 | 0, rr(0, 16) | 0, 1 + (rnd() * 3 | 0), rr(6, 20) | 0);
+      }
+    })
+  });
+  const WT_BRICK = L({
+    map: ctex(32, 32,
+    /**
+     * F207d — Малює червону цеглу з білими поясами кладки.
+     * Параметри: g.
+     */
+    g => {
+      g.fillStyle = '#6a3326';
+      g.fillRect(0, 0, 32, 32);
+      for (let y = 0; y < 32; y += 4) for (let x = (y / 4 % 2) * 4; x < 32; x += 8) {
+        const v = rr(-14, 14) | 0;
+        g.fillStyle = `rgb(${142 + v},${68 + v / 2 | 0},${48 + v / 3 | 0})`;
+        g.fillRect(x, y, 7, 3);
+      }
+      g.fillStyle = 'rgba(0,0,0,.08)';
+      for (let i = 0; i < 5; i++) g.fillRect(rnd() * 32 | 0, 0, 2, 32);
+    })
+  });
+  const WT_BAND = L({
+    color: 0xb8ab98
+  });
+  const WT_BLUE = L({
+    color: 0x3f86b8
+  });
+  const WT_RED = L({
+    color: 0xc0402c
+  });
+  const WT_LAMP = B({
+    color: 0xff5a3c
+  });
+  // shared geometries (metres)
+  const WTA_SHAFT = cylG(1.9, 2.05, 15, 0, 10);
+  const WTA_CONE = cylG(3.9, 1.9, 1.9, 15, 12);
+  const WTA_TANK = cylG(3.9, 3.9, 5.6, 16.9, 12);
+  const WTB_SHAFT = cylG(2.45, 2.7, 17, 0, 14, 3);
+  const WTB_CORB = cylG(3.45, 2.45, 1.7, 17, 14, 3);
+  const WTB_TANK = cylG(3.45, 3.45, 4.4, 18.7, 14, 3);
+  const WTB_BAND = new THREE.CylinderGeometry(1, 1, 1, 14).translate(0, .5, 0);
+  const WTC_COL = cylG(.85, .95, 13, 0, 10);
+  const WTC_CONE = cylG(2.4, .85, 2.6, 13, 12);
+  const WTC_TANK = cylG(2.4, 2.4, 9, 15.6, 12);
+  const WT_CAPG = new THREE.CylinderGeometry(1, 1, .3, 12).translate(0, .15, 0);
+  const WT_HOOP = new THREE.TorusGeometry(.42, .025, 3, 10).rotateX(Math.PI / 2);
+  const WT_RAILR = new THREE.TorusGeometry(1, .02, 3, 16).rotateX(Math.PI / 2);
+  /**
+   * F207e — Додає зовнішню драбину з огорожею-клітиною від y0 до y1 біля стіни в точці x.
+   * Параметри: G; x; z; y0; y1; mat.
+   */
+  function wtLadder(G, x, z, y0, y1, mat) {
+    for (const dz of [-.26, .26]) addBox(G, mat, x, y0, z + dz, .06, y1 - y0, .06);
+    const rungs = [];
+    for (let y = y0 + .35; y < y1; y += .4) rungs.push([x, y, z, .04, .04, .52]);
+    G.add(inst(GEO.box, mat, rungs));
+    const hoops = [];
+    for (let y = y0 + 2.4; y < y1 + .3; y += 1.15) hoops.push([x - .36, y, z, 1, 1, 1]);
+    G.add(inst(WT_HOOP, mat, hoops));
+    for (const dz of [-.36, .36]) addBox(G, mat, x - .74, y0 + 2.4, z + dz, .05, y1 - y0 - 2.1, .05);
+  }
+  /**
+   * F207f — Додає круглу огорожу на даху радіусом r на висоті y.
+   * Параметри: G; r; y; mat; h.
+   */
+  function wtRailing(G, r, y, mat, h = 1) {
+    const posts = [];
+    for (let k = 0; k < 10; k++) {
+      const a = k / 10 * Math.PI * 2;
+      posts.push([Math.cos(a) * r, y, Math.sin(a) * r, .06, h, .06]);
+    }
+    G.add(inst(GEO.box, mat, posts));
+    for (const yy of [y + h, y + h * .5]) {
+      const rr2 = new THREE.Mesh(WT_RAILR, mat);
+      rr2.position.y = yy;
+      rr2.scale.set(r, 1, r);
+      G.add(rr2);
+    }
+  }
+  /**
+   * F207g — Будує невелику технічну будівлю (насосну) біля башти.
    * Параметри: g; x; z.
    */
-  function waterTower(g, x, z) {
+  function wtHut(g, x, z) {
+    const w = rr(3.6, 5.2);
+    const d = rr(3, 4);
+    const h = rr(2.6, 3.2);
+    const m = pick([SILIC, BRICKM, WALLS[0], CONC]);
+    addBox(g, m, x, 0, z, w, h, d);
+    addBox(g, MAT.dark, x, h, z, w + .3, .22, d + .3);
+    addBox(g, pick([RUSTY, MAT.dark, WT_BLUE]), x - w * .22, 0, z + d / 2 + .02, .95, 2.05, .05);
+    addBox(g, WINVD, x + w * .22, 1.4, z + d / 2 + .02, .8, .6, .05);
+    if (chance(.6)) addBox(g, MAT.metal, x + w / 2 - .3, h, z - d / 4, .14, .9, .14);
+  }
+  /**
+   * F208 — Створює водонапірну башту одного з трьох типів (бетонна зі сталевим баком, цегляна, тонка синя сталева).
+   * Параметри: g; x; z; hut — чи ставити поруч технічну будівлю; type — 0..1 щоб вибрати тип вручну.
+   */
+  function waterTower(g, x, z, hut, type) {
     const G = new THREE.Group();
     G.position.set(x, 0, z);
-    G.rotation.y = rnd() * .4;
+    G.rotation.y = rr(-.5, .5);
     g.add(G);
-    const brick = chance(.7);
-    const wm = brick ? BRICKM : WTW;
-    const sh = new THREE.Mesh(WT_SHAFT, wm);
-    G.add(sh);
-    const ring = new THREE.Mesh(WT_RING, MAT.dark);
-    ring.position.y = 13;
-    G.add(ring);
-    const tk = new THREE.Mesh(WT_TANK, brick ? pick([MAT.wood, WALLS[0], BRICKM]) : WTW);
-    tk.position.y = 13.4;
-    G.add(tk);
-    const r2 = new THREE.Mesh(WT_RING, MAT.dark);
-    r2.position.y = 18;
-    G.add(r2);
-    const rf = new THREE.Mesh(WT_ROOF, pick([MAT.roof, ROOFS[1], MAT.dark]));
-    rf.position.y = 18.4;
-    G.add(rf);
-    const cp = new THREE.Mesh(WT_CAP, MAT.dark);
-    cp.position.y = 20.6;
-    G.add(cp);
-    addBox(G, MAT.dark, 0, 21.5, 0, .06, 1.2, .06);
-    for (let k = 0; k < 8; k++) {
-      const a = k / 8 * Math.PI * 2 + Math.PI / 8;
-      const w = new THREE.Group();
-      w.rotation.y = a;
-      G.add(w);
-      addBox(w, WINVD, 0, 15.1, 3.42, .9, 1.2, .06);
-      if (k % 2 === 0) addBox(w, WINVD, 0, 4.5 + k % 4 * 1.5, 2.55, .5, .9, .06);
+    const t = type === undefined ? rnd() : type;
+    const part = (geo, mat, y = 0) => {
+      const m = new THREE.Mesh(geo, mat);
+      m.position.y = y;
+      G.add(m);
+      return m;
+    };
+    if (t < .4) {
+      // concrete shaft, steel tank on a conical skirt, railing on top, caged ladder
+      part(WTA_SHAFT, WT_CONC);
+      part(WTA_CONE, WT_CONC);
+      part(WTA_TANK, chance(.6) ? WT_STEEL : WT_CONC);
+      part(WT_CAPG, MAT.dark, 22.5).scale.set(3.95, 1, 3.95);
+      wtRailing(G, 3.85, 22.8, MAT.metal);
+      for (const y of [5, 9.5]) addBox(G, WINVD, 0, y, 2.02, .3, 1.1, .08);
+      addBox(G, MAT.dark, 0, 0, 2.03, 1, 2, .06);
+      wtLadder(G, -4.3, 0, 0, 23.8, MAT.metal);
+      for (const y of [6, 12, 18]) addBox(G, MAT.metal, -3.2, y, 0, 2.4, .08, .08);
+      if (chance(.6)) addBox(G, MAT.metal, 2.4, 9.5, 0, 1.2, .1, .1);
+    } else if (t < .72) {
+      // round brick tower: light mortar bands, a column of small windows, wider corbelled tank storey
+      part(WTB_SHAFT, WT_BRICK);
+      part(WTB_CORB, WT_BRICK);
+      part(WTB_TANK, WT_BRICK);
+      for (const y of [4.2, 8.4, 12.6, 16.6]) {
+        const r = 2.7 - y / 17 * .25 + .04;
+        part(WTB_BAND, WT_BAND, y).scale.set(r, .16, r);
+      }
+      part(WTB_BAND, WT_BAND, 22.9).scale.set(3.5, .25, 3.5);
+      for (const y of [2.3, 5.7, 9.9, 14]) addBox(G, MAT.dark, 0, y, 2.66 - y / 17 * .22, .55, 1.15, .1);
+      for (const a of [-.9, 0, .9]) {
+        const w = new THREE.Group();
+        w.rotation.y = a;
+        G.add(w);
+        addBox(w, chance(.5) ? MAT.dark : WINVD, 0, 21.4, 3.47, .7, .8, .08);
+      }
+      addBox(G, MAT.dark, 0, 0, 2.72, 1.1, 2.1, .08);
+      if (chance(.5)) part(WT_CAPG, MAT.dark, 23.1).scale.set(3.4, 1, 3.4);
+    } else {
+      // slim blue steel tower: pipe column, cone, tall tank, red railing and beacon, caged ladder from the ground
+      part(WTC_COL, WT_BLUE);
+      part(WTC_CONE, WT_BLUE);
+      part(WTC_TANK, WT_BLUE);
+      part(WT_CAPG, WT_BLUE, 24.6).scale.set(2.45, 1, 2.45);
+      wtRailing(G, 2.3, 24.9, WT_RED, 1.1);
+      addBox(G, WT_RED, 0, 24.9, 0, .25, 1.6, .25);
+      addBox(G, WT_LAMP, 0, 26.5, 0, .3, .3, .3);
+      addBox(G, WT_BLUE, 0, 0, 0, 2.4, .4, 2.4);
+      wtLadder(G, -2.9, 0, 0, 25.6, WT_BLUE);
+      for (const y of [5, 10, 15, 20]) addBox(G, WT_BLUE, -1.9, y, 0, 2, .1, .1);
+      addBox(G, WT_BLUE, 2.4 + .9, 21.5, 0, 1.8, .12, .12);
     }
-    {
-      const w = new THREE.Group();
-      G.add(w);
-      addBox(w, MAT.wood, 0, 0, 2.62, 1.1, 2.1, .08);
-      addBox(w, MAT.dark, 0, 2.1, 2.66, 1.5, .15, .3);
+    if (hut) {
+      const a = G.rotation.y;
+      const s = pick([-1, 1]);
+      const dx = s * rr(7.5, 9.5);
+      const dz = rr(1.5, 4);
+      wtHut(g, x + dx * Math.cos(a) + dz * Math.sin(a), z - dx * Math.sin(a) + dz * Math.cos(a));
     }
+  }
+  /* ---------- where water towers stand: one per field, 1-2 per village and per SMT, one per suburb, at most one per warehouse zone ---------- */
+  const WTQ = {
+    b: null,
+    i: 0,
+    t: []
+  };
+  /**
+   * F208a — Повертає довжину поточного відрізка біому в 40-метрових частинах (за планом маршруту, якщо він є).
+   * Параметри: ax; b.
+   */
+  function wtRunLen(ax, b) {
+    if (planOff) return 3 + (rnd() * 6 | 0);
+    const k0 = slotK(ax);
+    let n = 0;
+    while (n < 80) {
+      const S = PL.get(k0 + n);
+      if (!S || (S.b === 'yard' ? 'depot' : S.b) !== b) break;
+      n++;
+    }
+    return Math.max(1, n);
+  }
+  /**
+   * F208b — Вирішує, чи стоїть у цьому відрізку водонапірна башта, і рівномірно розподіляє башти вздовж біому.
+   * Параметри: g; b.
+   */
+  function wtPlan(g, b) {
+    const want = {
+      field: 1,
+      village: 1 + (rnd() * 2 | 0),
+      pgt: 1 + (rnd() * 2 | 0),
+      cityforest: 1,
+      depot: chance(.6) ? 1 : 0
+    }[b];
+    const pv = chunks[chunks.length - 1];
+    if (WTQ.b !== b || !pv || pv.userData.biome !== b) {
+      const len = wtRunLen(g.userData.ax, b);
+      WTQ.b = b;
+      WTQ.i = 0;
+      WTQ.t = [];
+      for (let k = 0; k < (want || 0); k++) WTQ.t.push(Math.floor(len * (k + rr(.15, .85)) / want));
+    }
+    const hit = WTQ.t.includes(WTQ.i);
+    WTQ.i++;
+    return hit;
+  }
+  /**
+   * F208c — Якщо башту в цьому відрізку поставити не вдалося, переносить її на наступний.
+   */
+  function wtPostpone() {
+    if (!WTQ.t.includes(WTQ.i)) WTQ.t.push(WTQ.i);
+  }
+  /**
+   * F208d — Ставить башту (з насосною, якщо hut) і забороняє дерева навколо неї.
+   * Параметри: g; x; z; hut.
+   */
+  function wtAt(g, x, z, hut) {
+    waterTower(g, x, z, hut);
+    (g.userData.wtClear || (g.userData.wtClear = [])).push([x, z, hut ? 14 : 7]);
   }
   /* ---------- villages and industrial zones ---------- */
   /**
@@ -5513,6 +5727,11 @@
     const xm = rs ? 10 : 1;
     for (const [zc, pr] of [[-50, .9], [-84, .75], [-120, .55]]) {
       let x = xm;
+      if (zc === -84 && g.userData.wt && !roadHit(g, x + 9, zc, 13)) {
+        wtAt(g, x + 6, zc - 2, true);
+        g.userData.wtDone = 1;
+        x += 21;
+      }
       while (x < CL - 6) {
         const r = rnd();
         if (!chance(pr)) {
@@ -5564,8 +5783,18 @@
     vpole(rg, 22, -12.6);
     for (const dz of [-.6, .6]) addBox(rg, MAT.dark, CL / 2 + 2, 6.45, -12.6 + dz * .6, CL, .025, .025);
     if (first && !roadNear(g.userData.ax, 25)) feeder(g);
+    const wtSx = g.userData.wt ? pick([0, 20]) : -1;
     for (const [za, zb, pr] of [[-21, -24, .6], [-46, -66, .5], [-92, -128, .4]]) for (let sx = 0; sx < CL; sx += 20) {
       if (first && sx === 0 && za === -21) continue;
+      if (za === -46 && sx === wtSx) {
+        const x = sx + rr(8, 12);
+        const z = rr(-56, -64);
+        if (!roadHit(g, x, z, 13)) {
+          wtAt(g, x, z, true);
+          g.userData.wtDone = 1;
+          continue;
+        }
+      }
       if (!chance(pr)) continue;
       const x = sx + rr(9, 11);
       const z = rr(za, zb);
@@ -7152,7 +7381,7 @@
     }
     {
       const n0 = g.children.length;
-      if (chance(.15)) waterTower(g, rr(5, 35), rr(-85, -110));
+      if (g.userData.wt) waterTower(g, rr(5, 35), rr(-85, -110));
       if (chance(.12)) {
         const x = rr(5, 35);
         const z = rr(-90, -130);
@@ -8570,7 +8799,6 @@
       }
       if (chance(.08)) bonfire(g, rr(5, 35), rr(-25, -45));
       if (chance(.05)) church(g, rr(5, 30), rr(-140, -170));
-      if (chance(.05)) waterTower(g, rr(5, 35), rr(-60, -90));
       if (chance(.05)) {
         const x = rr(5, 30);
         const z = rr(-22, -40);
@@ -8892,6 +9120,7 @@
       if (shIdx === 4) stShift = false;
     }
     if (!stationBuild && !stShift) stNamePlan = null;
+    g.userData.wt = !st && !yardC && wtPlan(g, biome);
     if (st) {} else if (yardC) yardChunk(g, c);else if (biome === 'forest' || biome === 'birch') {
       for (let i = 0; i < 34; i++) tree(c, rr(0, CL), rr(-9, -40), rr(7, 15), MIX);
       for (let i = 0; i < 14; i++) tree(c, rr(0, CL), rr(-40, -70), rr(8, 16), MIX);
@@ -9039,7 +9268,12 @@
     if (!g.userData.station) {
       if (!g.userData.vpart) details(g, biome, c, MIX);
       if (roads.length) clearRoads(g, c);
-    } else if (!stShift && night < .35 && chance(.45)) crows(g);
+    }
+    if (g.userData.wt && (biome === 'field' || biome === 'cityforest')) {
+      const x = rr(9, 31);
+      const z = biome === 'field' ? rr(-45, -85) : rr(-126, -136);
+      if (g.userData.station || g.userData.vpart || g.userData.river || roadNear(g.userData.ax + x, 25) || roadHit(g, x, z, 14)) wtPostpone();else wtAt(g, x, z, true);
+    } else if (g.userData.wt && (biome === 'village' || biome === 'pgt') && !g.userData.wtDone) wtPostpone(); else if (!stShift && night < .35 && chance(.45)) crows(g);
     if (g.userData.sidLim) sidClear(g, c);
     if (g.userData.post) for (const f of g.userData.post) f(c);
     if (['industrial', 'depot'].includes(biome) || g.userData.yard) {
@@ -9103,6 +9337,7 @@
        */
       q => q.p.parent === g || q.p.parent && q.p.parent.parent === g);
     }
+    if (g.userData.wtClear) for (const k of ['tr', 'bt', 'bl', 'co', 'sp']) if (c[k]) c[k] = c[k].filter(t => !g.userData.wtClear.some(w => Math.hypot(t[0] - w[0], t[2] - w[1]) < w[2]));
     if (c.sp.length) {
       if (g.userData.noTree) c.sp = c.sp.filter(
       /**
@@ -12005,7 +12240,7 @@
    * Параметри: root.
    */
   function freeTree(root) {
-    if (!SHARED) SHARED = new Set([...Object.values(GEO), PRISM, TANK, PIPE, COOL, UMB_GEO, POOL_GEO, TPOOL_GEO, ROUNDG, ROUNDRIM, WT_SHAFT, WT_TANK, WT_RING, WT_ROOF, WT_CAP]);
+    if (!SHARED) SHARED = new Set([...Object.values(GEO), PRISM, TANK, PIPE, COOL, UMB_GEO, POOL_GEO, TPOOL_GEO, ROUNDG, ROUNDRIM, WTA_SHAFT, WTA_CONE, WTA_TANK, WTB_SHAFT, WTB_CORB, WTB_TANK, WTB_BAND, WTC_COL, WTC_CONE, WTC_TANK, WT_CAPG, WT_HOOP, WT_RAILR]);
     root.traverse(
     /**
      * F499 — Звільняє локальні геометрії та позначені ресурси одного об’єкта дерева сцени.
@@ -14246,4 +14481,3 @@
 </script>
   </body>
 </html>
-</body></html>
