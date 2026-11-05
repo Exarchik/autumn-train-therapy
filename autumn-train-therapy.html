@@ -531,7 +531,7 @@
 () => {
   /* ---------- switches ---------- */
   const MENU_ENABLED = true; // single click / tap opens the side menu (stereo mode etc.)
-  const TEST_TOOLS = true; // NumPad test keys: + station, − island, 4 island with train, 6 split truss bridge over the sea, 7 yard, 8 tunnel, 9 oncoming train
+  const TEST_TOOLS = true; // NumPad test keys: + station, − island, 4 island with train, 6 big bridge over the sea (random layout, top and bottom), 7 yard, 8 tunnel, 9 oncoming train
   const STEREO_EYE = .064; // distance between the two stereo cameras, metres (average human eye distance)
   const STEREO_SIDE = 1; // where the second (right-half) camera sits: 1 = to the right (correct for VR glasses), -1 = to the left (cross-eyed viewing)
   const LENS_K1 = .22;
@@ -1888,7 +1888,7 @@
    * Параметри: g; x; z; v; y0=1.05.
    */
   function makePerson(g, x, z, v, y0 = 1.05) {
-    const p = new THREE.Group();
+    const p = dyn(new THREE.Group());
     p.position.set(x, y0, z);
     p.rotation.order = 'YXZ';
     const coat = pick(COATS);
@@ -3488,7 +3488,7 @@
     const PT = g.userData.PT || 1.05;
     const list = g.userData.pigeons = [];
     for (let k = 0; k < n; k++) {
-      const b = new THREE.Group();
+      const b = dyn(new THREE.Group());
       b.position.set(rr(pl[0] + 1, pl[1] - 1), PT, rr(pl[3] + .3, pl[2] - .3));
       b.rotation.y = rr(0, 6.3);
       const m = pick(PIGM);
@@ -4121,6 +4121,7 @@
    * Параметри: o; c.
    */
   function regShunt(o, c) {
+    dyn(o, true);
     SHUNTS.push({
       o,
       c,
@@ -4132,7 +4133,7 @@
    * F169 — Створює модель маневрового локомотива та повертає її групу.
    */
   function shunter() {
-    const t = new THREE.Group();
+    const t = dyn(new THREE.Group(), true);
     const m = pick(LOCOC);
     addBox(t, MAT.dark, 0, RT, 0, 13.5, .55, 2.4);
     addBox(t, MAT.dark, -4, RT - .05, 0, 2.6, .6, 2.2);
@@ -4338,7 +4339,195 @@
     };
     p.wag1 = !p.shunt && chance(.75);
     p.wag2 = two && chance(.85);
+    p.ph = rr(AWAY_ANG[0], AWAY_ANG[1]) * Math.PI / 180; // branch to a depot: angle to the main line
+    p.R = rr(70, 110) + Math.max(0, p.ph - 1.2) * 60; // curve radius: wider for steep angles, so the depot ends up further out
+    p.Ld = rr(40, 65) + Math.max(0, p.ph - 1.2) * 25; // straight before the shed
+    return awayFit(p);
+  }
+  // ---- branch line that leaves the siding for a depot (or a long dead end) somewhere in the warehouse / industrial zone ----
+  // the whole branch is laid out in advance as a "zone": the chunks it crosses get no regular buildings, trees keep clear
+  // of the tracks, the shed and its fence, and the route plan keeps bridges and roads out of it
+  let awayZone = null;
+  const AWAY_ANG = [17, 135]; // angle between the main line and the depot branch, degrees (over 90° the depot faces back)
+  const AWAY_RECT = {
+    uA: -26,
+    uB: 38,
+    vA: -13.5,
+    vB: 9
+  }; // depot frame around the shed and its fence: u along the track from the track end, v to the side
+  /**
+   * F175a — Геометрія відгалуження для плану p (без випадковості): дуга радіусом p.R на кут p.ph, пряма, депо.
+   * Повертає точки, кінець прямої, межі для дерев і крайні x (щоб зона не заходила на вже збудовані відрізки).
+   * Параметри: p; dep — чи є депо.
+   */
+  function awayGeom(p, dep) {
+    const z1 = ZL(1);
+    const R = p.R;
+    const ph = p.ph;
+    const pts = [];
+    const sN = Math.ceil(R * ph / 2.5);
+    for (let k = 0; k <= sN; k++) {
+      const h = k / sN * ph;
+      pts.push([4 + R * Math.sin(h), z1 - R * (1 - Math.cos(h)), .8 - .68 * k / sN]);
+    }
+    const e = pts[pts.length - 1];
+    const dx = Math.cos(ph);
+    const dz = -Math.sin(ph);
+    // a dead end without a depot is up to 150 m long, but never runs back over chunks already built
+    const L = dep ? p.Ld : Math.max(30, Math.min(150, dx < -.05 ? (e[0] - 6) / -dx : 150));
+    const E = [e[0] + dx * L, e[1] + dz * L, e[2]];
+    const keep = [];
+    for (let i = 1; i < pts.length; i++) keep.push([pts[i - 1][0], pts[i - 1][1], pts[i][0], pts[i][1], 4.2]);
+    keep.push([e[0], e[1], E[0], E[1], 4.2]);
+    const rect = dep ? Object.assign({}, AWAY_RECT, {
+      uA: -Math.min(L - 8, 26)
+    }) : null;
+    const xs = pts.map(q => q[0]).concat([E[0]]);
+    if (rect) for (const u of [rect.uA, rect.uB]) for (const v of [rect.vA, rect.vB]) xs.push(E[0] + u * dx - v * dz);
+    return {
+      pts,
+      e,
+      E,
+      dx,
+      dz,
+      L,
+      keep,
+      rect,
+      minX: Math.min(...xs),
+      maxX: Math.max(...xs)
+    };
+  }
+  /**
+   * F175a2 — Довжина зони відгалуження вздовж колії (м) для плану p.
+   * Параметри: p.
+   */
+  function awayLen(p) {
+    return Math.max(awayGeom(p, true).maxX, awayGeom(p, false).maxX) + 10;
+  }
+  /**
+   * F175a3 — Підбирає радіус дуги так, щоб депо під великим кутом (аж до 135°, тобто «назад») не заходило на відрізки позаду.
+   * Параметри: p.
+   */
+  function awayFit(p) {
+    for (let k = 0; k < 40 && awayGeom(p, true).minX < 2; k++) p.R += 8;
     return p;
+  }
+  /**
+   * F175b — Розкладає відгалуження в зоні, що починається з відрізка ax0: колії, депо під кутом p.ph, огорожа.
+   * Параметри: p — план бічних колій; ax0; biome.
+   */
+  function awayMake(p, ax0, biome) {
+    const dep = p.depot || ['depot', 'industrial'].includes(biome) && chance(.6);
+    awayFit(p);
+    const G = awayGeom(p, dep);
+    const Z = Object.assign(G, {
+      ax0,
+      ph: p.ph,
+      dep,
+      fence: dep && chance(.7),
+      len: awayLen(p)
+    });
+    Z.ax1 = ax0 + Z.len;
+    return Z;
+  }
+  /**
+   * F175c — Чи точка (x від початку зони, z) ближче за pad до колій, депо чи огорожі відгалуження.
+   * Параметри: Z; x; z; pad.
+   */
+  function awayHit(Z, x, z, pad) {
+    for (const [ax, az, bx, bz, r] of Z.keep) {
+      const vx = bx - ax;
+      const vz = bz - az;
+      const l2 = vx * vx + vz * vz || 1;
+      const t = Math.max(0, Math.min(1, ((x - ax) * vx + (z - az) * vz) / l2));
+      if (Math.hypot(x - ax - vx * t, z - az - vz * t) < r + pad) return true;
+    }
+    if (Z.rect) {
+      const px = x - Z.E[0];
+      const pz = z - Z.E[1];
+      const u = px * Z.dx + pz * Z.dz;
+      const v = px * -Z.dz + pz * Z.dx;
+      const q = Z.rect;
+      if (u > q.uA - pad && u < q.uB + pad && v > q.vA - pad && v < q.vB + pad) return true;
+    }
+    return false;
+  }
+  /**
+   * F175d — Ряд бетонних плит паркану від a до b (локальні x/z відрізка).
+   * Параметри: G; a; b.
+   */
+  function fenceRun(G, a, b) {
+    const l = Math.hypot(b[0] - a[0], b[1] - a[1]);
+    const n = Math.max(1, Math.round(l / 3));
+    const ang = Math.atan2(-(b[1] - a[1]), b[0] - a[0]);
+    const p = [];
+    for (let k = 0; k < n; k++) {
+      const t = (k + .5) / n;
+      if (chance(.05)) continue;
+      p.push([a[0] + (b[0] - a[0]) * t, 0, a[1] + (b[1] - a[1]) * t, l / n - .1, 2.4, .15, 0, ang, 0]);
+    }
+    if (p.length) G.add(inst(GEO.box, CONC, p));
+  }
+  /**
+   * F175e — Будує колії, депо й огорожу відгалуження в групі G відрізка, де колія відходить.
+   * Параметри: G; g; Z.
+   */
+  function awayBuild(G, g, Z) {
+    trackAlong(G, Z.pts);
+    const e = Z.e;
+    const dx = Z.dx;
+    const dz = Z.dz;
+    const far = [e, Z.E];
+    trackAlong(G, far, false);
+    seg(G, BALM, far[0], far[1], 4, .4, 0, -.1);
+    if (!Z.dep) {
+      bufferStop(G, Z.E[0], Z.E[1], e[2], 1).rotation.y = Math.atan2(-dz, dx);
+      return;
+    }
+    const L = Z.L;
+    const side = -1;
+    const nx = -dz * side;
+    const nz = dx * side;
+    const s0 = 8;
+    const s1 = 34;
+    const b2 = [];
+    for (let k = 0; k <= 13; k++) {
+      const t = k / 13;
+      const s = s0 + (s1 - s0) * t;
+      const o = 4.5 * ease(t);
+      b2.push([e[0] + dx * s + nx * o, e[1] + dz * s + nz * o, e[2]]);
+    }
+    const q = b2[b2.length - 1];
+    b2.push([q[0] + dx * (L - s1), q[1] + dz * (L - s1), e[2]]);
+    trackAlong(G, b2, true);
+    depotShed(G, Z.E, Math.atan2(-dz, dx), side, g, L);
+    if (Z.fence) {
+      const P = (u, v) => [Z.E[0] + u * dx - v * dz, Z.E[1] + u * dz + v * dx];
+      const r = Z.rect;
+      fenceRun(G, P(r.uA, r.vB), P(r.uB, r.vB));
+      fenceRun(G, P(r.uB, r.vB), P(r.uB, r.vA));
+      fenceRun(G, P(r.uB, r.vA), P(r.uA, r.vA));
+      // the end the tracks come through: a gate gap between v = -7.5 and +3
+      fenceRun(G, P(r.uA, r.vA), P(r.uA, -7.5));
+      fenceRun(G, P(r.uA, 3), P(r.uA, r.vB));
+    }
+  }
+  /**
+   * F175f — Заповнення відрізків, через які проходить відгалуження: дерева, кущі та трохи складського мотлоху поза зоною колій.
+   * Параметри: g; c; MIX; Z.
+   */
+  function awayFill(g, c, MIX, Z) {
+    const ox = g.userData.ax - Z.ax0;
+    for (let i = 0; i < 26; i++) tree(c, rr(0, CL), rr(-14, -120), rr(6, 12), MIX);
+    for (let i = 0; i < 18; i++) indBush(c, rr(0, CL), rr(-14, -90), rr(.8, 1.6));
+    for (let i = 0; i < 4; i++) {
+      const x = rr(3, 37);
+      const z = rr(-16, -80);
+      if (awayHit(Z, ox + x, z, 6)) continue;
+      if (chance(.5)) for (let k = 0; k < 1 + (rnd() * 3 | 0); k++) addBox(g, pick(CONTC), x + k * 2.7, 0, z, 2.45, 2.55, 6).rotation.y = rr(-.1, .1);
+      else for (let k = 0; k < 2 + (rnd() * 4 | 0); k++) addBox(g, PALM, x + rr(-1.5, 1.5), k * .16, z + rr(-1, 1), 1.2, .15, 1);
+    }
+    treeline(c, -130, -190, 22, MIX);
   }
   /**
    * F176 — Будує черговий відрізок бічних колій за активним планом sid.
@@ -4381,45 +4570,15 @@
     } else {
       W(line(z1, z1, 0, 4));
       wireEnd(G, 4, z1, 1);
-      const R = rr(70, 95);
-      const ph = rr(.42, .6);
-      const pts = [];
-      for (let s = 0; s <= R * ph + .01; s += 2.5) {
-        const h = s / R;
-        pts.push([4 + R * Math.sin(h), z1 - R * (1 - Math.cos(h)), .8 - .68 * Math.min(1, s / (R * ph))]);
-      }
-      trackAlong(G, pts);
-      const e = pts[pts.length - 1];
-      const dx = Math.cos(ph);
-      const dz = -Math.sin(ph);
-      const dep = p.depot || ['depot', 'industrial'].includes(g.userData.biome) && chance(.6);
-      const L = dep ? rr(45, 70) : 150;
-      const far = [e, [e[0] + dx * L, e[1] + dz * L, e[2]]];
-      trackAlong(G, far, false);
-      seg(G, BALM, far[0], far[1], 4, .4, 0, -.1);
-      if (dep) {
-        const side = -1;
-        const nx = -Math.sin(ph) * side * -1;
-        const nz = -Math.cos(ph) * side * -1;
-        const s0 = 8;
-        const s1 = 34;
-        const b2 = [];
-        for (let k = 0; k <= 13; k++) {
-          const t = k / 13;
-          const s = s0 + (s1 - s0) * t;
-          const o = 4.5 * ease(t);
-          b2.push([e[0] + dx * s + nx * o, e[1] + dz * s + nz * o, e[2]]);
-        }
-        const q = b2[b2.length - 1];
-        b2.push([q[0] + dx * (L - s1), q[1] + dz * (L - s1), e[2]]);
-        trackAlong(G, b2, true);
-        depotShed(G, far[1], Math.atan2(-dz, dx), side, g, L);
-      } else bufferStop(G, far[1][0], far[1][1], e[2], 1).rotation.y = Math.atan2(-dz, dx);
+      const Z = awayZone && awayZone.ax0 === g.userData.ax ? awayZone : awayMake(p, g.userData.ax, g.userData.biome);
+      awayBuild(G, g, Z);
+      const e = Z.e;
+      const ph = Z.ph;
       const t = (e[1] + 3.6) / Math.sin(ph);
       roads.push({
         ax: g.userData.ax + e[0] + t * Math.cos(ph),
         ang: Math.atan2(-Math.cos(ph), Math.sin(ph)),
-        w: dep ? 24 : 8
+        w: Z.dep ? 24 : 8
       });
       noLakeUntil = Math.max(noLakeUntil, g.userData.ax + 520);
     }
@@ -4649,7 +4808,7 @@
    * Параметри: g; x; z; s; mat; up; patch.
    */
   function quad(g, x, z, s, mat, up, patch) {
-    const q = new THREE.Group();
+    const q = dyn(new THREE.Group());
     q.position.set(x, 0, z);
     q.rotation.y = rr(0, 6.3);
     addBox(q, mat, 0, .55 * s, 0, 1.4 * s, .6 * s, .55 * s);
@@ -4753,8 +4912,8 @@
     r.add(arm);
     addBox(r, MAT.dark, -4.6, .95, -10, .5, .22, .22);
     addBox(r, MAT.metal, -4.7, 0, -8.6, .12, 3.3, .12);
-    const l1 = addBox(r, DM.red, -4.95, 2.4, -8.55, .2, .2, .08);
-    const l2 = addBox(r, DM.red, -4.45, 2.4, -8.55, .2, .2, .08);
+    const l1 = dyn(addBox(r, DM.red, -4.95, 2.4, -8.55, .2, .2, .08));
+    const l2 = dyn(addBox(r, DM.red, -4.45, 2.4, -8.55, .2, .2, .08));
     for (const s of [-1, 1]) {
       const x = new THREE.Mesh(GEO.cbox, DM.white);
       x.scale.set(1.3, .16, .04);
@@ -4807,6 +4966,20 @@
     const A = g.userData.ax + lx;
     for (const rd of roads) {
       const m = m0 + ((rd.w || 7) - 7) / 2;
+      if (rd.pts) {
+        // a winding road: distance to its centre line
+        let best = 1e9;
+        for (let i = 1; i < rd.pts.length; i++) {
+          const [ax, az] = rd.pts[i - 1];
+          const [bx, bz] = rd.pts[i];
+          const vx = bx - ax;
+          const vz = bz - az;
+          const t = Math.max(0, Math.min(1, ((A - ax) * vx + (lz - az) * vz) / (vx * vx + vz * vz || 1)));
+          best = Math.min(best, Math.hypot(A - ax - vx * t, lz - az - vz * t));
+        }
+        if (best < m) return true;
+        continue;
+      }
       const Dx = -Math.sin(rd.ang);
       const Dz = -Math.cos(rd.ang);
       const dx = A - rd.ax;
@@ -5642,34 +5815,71 @@
    * F227 — Створює відгалуження сільської дороги й реєструє смугу, вільну від перешкод.
    * Параметри: g.
    */
-  function feeder(g) {
-    const ang = -rr(.3, .55);
-    const dx = Math.sin(-ang);
-    const dz = -Math.cos(ang);
+  function feeder(g, x0 = 2) {
+    // a smooth country road: leaves the road along the track tangentially, bends away from the railway and then wanders a little
     const grp = new THREE.Group();
     grp.userData.keep = 1;
     g.add(grp);
-    roads.push({
-      ax: g.userData.ax + 3 - 8.4 * Math.tan(-ang),
-      ang,
-      w: 10
-    });
-    const rd = new THREE.Mesh(GEO.cbox, DIRT);
-    rd.scale.set(3.4, .05, 150);
-    rd.position.set(3 + dx * 75, .03, -12 + dz * 75);
-    rd.rotation.y = ang;
+    const h0 = rr(1, 1.35); // final heading away from the track, rad from the track direction
+    const bend = rr(14, 22); // length of the turn out of the main road
+    const amp = rr(.12, .3);
+    const wl = rr(40, 70);
+    const ph = rr(0, 6.3);
+    const pts = [];
+    let x = x0;
+    let z = -10.6;
+    for (let s = 0; s <= 160; s += 2) {
+      const k = Math.min(1, s / bend);
+      const h = h0 * k * k * (3 - 2 * k) + (s > bend ? amp * Math.sin((s - bend) / wl * 6.283 + ph) * Math.min(1, (s - bend) / 20) : 0);
+      pts.push([x, z, h]);
+      x += Math.cos(h) * 2;
+      z -= Math.sin(h) * 2;
+    }
+    // ribbon of dirt, 3.4 m wide, a hair above the main road where they overlap
+    const W = 1.7;
+    const v = [];
+    const uv = [];
+    for (let i = 1; i < pts.length; i++) {
+      const [ax, az, ha] = pts[i - 1];
+      const [bx, bz, hb] = pts[i];
+      const na = [Math.sin(ha) * W, Math.cos(ha) * W];
+      const nb = [Math.sin(hb) * W, Math.cos(hb) * W];
+      const y = .045;
+      const A1 = [ax - na[0], y, az - na[1]];
+      const A2 = [ax + na[0], y, az + na[1]];
+      const B1 = [bx - nb[0], y, bz - nb[1]];
+      const B2 = [bx + nb[0], y, bz + nb[1]];
+      v.push(...A1, ...B1, ...B2, ...A1, ...B2, ...A2);
+      const u0 = (i - 1) * .5;
+      const u1 = i * .5;
+      uv.push(u0, 0, u1, 0, u1, .85, u0, 0, u1, .85, u0, .85);
+    }
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.Float32BufferAttribute(v, 3));
+    geo.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
+    geo.computeVertexNormals();
+    const rd = new THREE.Mesh(geo, DIRT);
+    rd.material.side = THREE.DoubleSide;
     grp.add(rd);
-    vpole(grp, 2, -12.6);
-    let pa = new THREE.Vector3(2, 6.45, -12.6);
-    for (let k = 1; k <= 6; k++) {
-      const x = 2 + dx * k * 22;
-      const z = -12.6 + dz * k * 22;
-      vpole(grp, x, z);
-      const pb = new THREE.Vector3(x, 6.45, z);
-      wireSeg(grp, pa, pb);
+    roads.push({
+      ax: g.userData.ax + x0,
+      ang: 0,
+      w: 10,
+      pts: pts.map(p => [g.userData.ax + p[0], p[1]])
+    });
+    // a pole line along the road, on its far side
+    let pa = null;
+    for (let i = 0; i < pts.length; i += 11) {
+      const [px, pz, h] = pts[i];
+      const qx = px + Math.sin(h) * -2.4;
+      const qz = pz + Math.cos(h) * -2.4;
+      vpole(grp, qx, qz);
+      const pb = new THREE.Vector3(qx, 6.45, qz);
+      if (pa) wireSeg(grp, pa, pb);
       pa = pb;
     }
   }
+
   /**
    * F228 — Створює сільське подвір’я: хату, паркан, город та господарські деталі.
    * Параметри: g; c; x; z.
@@ -6426,7 +6636,7 @@
     addBox(G, m, -S + 3.2, H - 2.1, w - .2, 1.9, 1.9, 1.7);
     addBox(G, MAT.trainWin, -S + 3.2, H - 1.5, w + .66, 1.5, .7, .04);
     addBox(G, MAT.metal, -S + 3.2, H - .2, w - .2, .12, .2, .12);
-    const tr = new THREE.Group();
+    const tr = dyn(new THREE.Group());
     tr.position.set(rr(-S + 3, S - 3), H + h, 0);
     G.add(tr);
     addBox(tr, m, 0, 0, 0, 2, .7, 2.3);
@@ -6893,34 +7103,6 @@
     c.bl.push([x, -.2, z, r, r * rr(.6, .85), r * rr(.8, 1.2), 0, rr(0, 6), 0, col]);
     if (chance(.55)) c.bl.push([x + rr(-1, 1), -.2, z + rr(-.6, .6), r * .7, r * .6, r * .7, 0, rr(0, 6), 0, pick(BUSHC)]);
   }
-  /**
-   * F280 — Оформлює передній план промзони контейнерами, деталями та рослинністю.
-   * Параметри: g; c; MIX.
-   */
-  function indFront(g, c, MIX) {
-    if (chance(.5)) {
-      /* row of containers screening the yard */let x = rr(-1, 1.5);
-      while (x < CL - 3) {
-        const l = chance(.3) ? 12 : 6;
-        const m = pick(CONTC);
-        const z = -12.9 + rr(-.25, .25);
-        if (x + l > CL + .5) break;
-        addBox(g, m, x + l / 2, 0, z, l, 2.55, 2.45).rotation.y = rr(-.02, .02);
-        if (l === 6 && chance(.3)) {
-          const t = addBox(g, pick(CONTC), x + 3 + rr(-.4, .4), 2.55, z + rr(-.1, .1), 6, 2.55, 2.45);
-          t.rotation.y = rr(-.04, .04);
-        }
-        if (chance(.25)) graffiti(g, 1, x + .4, x + l - .4, z + 1.24, .2, 2.3);
-        const gap = chance(.2) ? rr(1.5, 3) : rr(.15, .8);
-        if (gap > 1.4) indBush(c, x + l + gap / 2, z - .3, rr(.8, 1.2));
-        x += l + gap;
-      }
-      for (let i = 0; i < 3; i++) tree(c, rr(0, CL), rr(-15.5, -19), rr(5, 9), MIX);
-    } else {
-      /* overgrown strip: bushes with trees behind */for (let x = rr(0, 1.5); x < CL; x += rr(1.4, 2.6)) indBush(c, x, rr(-12.6, -14.8), rr(.9, 1.7));
-      for (let x = rr(0, 3); x < CL; x += rr(3.5, 6)) tree(c, x, rr(-13.5, -17.5), rr(5, 10), MIX);
-    }
-  }
   // factory siding along the fence: ballasted and shining like a normal siding, no catenary; crossovers to the oncoming-train track now and then
   const ZI = -9.45;
   /**
@@ -7021,18 +7203,264 @@
    * F285 — Створює промисловий відрізок: огорожі, корпуси, колії, обладнання і рослинність.
    * Параметри: g; c; MIX.
    */
-  function industrial(g, c, MIX) {
-    {
-      const n0 = g.children.length;
-      if (chance(.75)) {
-        const p = [];
-        for (let x = 0; x < CL; x += 3) p.push([x + 1.5, 0, -11.6, 2.9, 2.4, .15]);
-        g.add(inst(GEO.box, CONC, p));
-        addBox(g, MAT.dark, CL / 2, 2.5, -11.6, CL, .03, .03);
-        if (chance(.6)) graffiti(g, 1 + (rnd() * 3 | 0), 0, CL, -11.6 + .09, .2, 2.3);
-      } else indFront(g, c, MIX);
-      pack(g, n0);
+  // ---- concrete fence around the whole industrial zone: plain slightly leaning panels, left out wherever they would hit something ----
+  const FENCE_Z = [-11.6, -13.8]; // where the front fence may run (the second line steps back behind the bed of a factory siding)
+  const FENCE_BACK = -60; // the side fences at the ends of the zone run back to here
+  /**
+   * F239a — Перешкоди відрізка для паркану: рамки звичайних мешів (будівлі, контейнери, насипи колій, труби) і точки дерев/кущів.
+   * Параметри: g; c — масиви дерев цього відрізка.
+   */
+  function fenceObstacles(g, c) {
+    const boxes = [];
+    const b = new THREE.Box3();
+    g.updateMatrixWorld(true);
+    const inv = new THREE.Matrix4().copy(g.matrixWorld).invert();
+    g.traverse(o => {
+      if (!o.isMesh || o.isInstancedMesh || o.userData.ground || o.userData.fence) return;
+      if (!o.geometry.boundingBox) o.geometry.computeBoundingBox();
+      b.copy(o.geometry.boundingBox).applyMatrix4(o.matrixWorld).applyMatrix4(inv);
+      if (b.max.x - b.min.x > 60 || b.max.z - b.min.z > 60 || b.max.y < .35) return; // low things (ballast slopes, slabs) don't stop a fence
+      boxes.push(b.clone().expandByScalar(.15));
+    });
+    const pts = [];
+    if (c) {
+      for (const t of c.tr || []) pts.push([t[0], t[2], .7]);
+      for (const t of c.bt || []) pts.push([t[0], t[2], .6]);
+      for (const t of c.sp || []) pts.push([t[0], t[2], 1]);
+      for (const t of c.bl || []) if (t[1] - t[4] < 2.6) pts.push([t[0], t[2], t[3] + .2]);
+      for (const t of c.co || []) if (t[1] < 2.6) pts.push([t[0], t[2], t[3] + .2]);
     }
+    return {
+      boxes,
+      pts
+    };
+  }
+  /**
+   * F239b — Чи вільне місце для однієї плити від (ax,az) до (bx,bz).
+   * Параметри: g; O; ax; az; bx; bz.
+   */
+  function fenceFree(g, O, ax, az, bx, bz) {
+    const P = new THREE.Box3(new THREE.Vector3(Math.min(ax, bx) - .1, 0, Math.min(az, bz) - .1), new THREE.Vector3(Math.max(ax, bx) + .1, 2.4, Math.max(az, bz) + .1));
+    for (const B of O.boxes) if (B.intersectsBox(P)) return false;
+    for (const [x, z, r] of O.pts) {
+      const vx = bx - ax;
+      const vz = bz - az;
+      const t = Math.max(0, Math.min(1, ((x - ax) * vx + (z - az) * vz) / (vx * vx + vz * vz)));
+      if (Math.hypot(x - ax - vx * t, z - az - vz * t) < r + .1) return false;
+    }
+    if (roads.length && roadHit(g, (ax + bx) / 2, (az + bz) / 2, 2)) return false;
+    return true;
+  }
+  /**
+   * F239c — Ставить плити паркану вздовж відрізка a→b, пропускаючи зайняті місця; повертає безперервні ділянки (для графіті).
+   * Параметри: g; O; a; b.
+   */
+  function fenceAlong(g, O, a, b) {
+    const l = Math.hypot(b[0] - a[0], b[1] - a[1]);
+    const n = Math.max(1, Math.round(l / 3));
+    const ang = Math.atan2(-(b[1] - a[1]), b[0] - a[0]);
+    const p = [];
+    const runs = [];
+    let run = null;
+    for (let k = 0; k < n; k++) {
+      const t0 = k / n;
+      const t1 = (k + 1) / n;
+      const ax = a[0] + (b[0] - a[0]) * t0;
+      const az = a[1] + (b[1] - a[1]) * t0;
+      const bx = a[0] + (b[0] - a[0]) * t1;
+      const bz = a[1] + (b[1] - a[1]) * t1;
+      if (!fenceFree(g, O, ax, az, bx, bz)) {
+        run = null;
+        continue;
+      }
+      // a plain panel leaning a little this or that way
+      p.push([(ax + bx) / 2, 0, (az + bz) / 2, l / n - .08, 2.4, .15, rr(-.06, .06), ang, rr(-.015, .015)]);
+      if (!run) runs.push(run = [k, k]);else run[1] = k;
+    }
+    if (p.length) {
+      const m = inst(GEO.box, CONC, p);
+      m.userData.fence = 1;
+      g.add(m);
+    }
+    return runs.map(([k0, k1]) => [k0 / n, (k1 + 1) / n]);
+  }
+  /**
+   * F239d — Огороджує відрізок промзони чи складів: паркан уздовж колії, а на початку та в кінці зони — бічні паркани вглиб.
+   * Викликається після того, як у відрізку вже стоять усі будівлі, колії й дерева.
+   * Параметри: g; c.
+   */
+  function indFence(g, c) {
+    const O = fenceObstacles(g, c);
+    // the front line: whichever of the two lines is freer
+    let best = null;
+    for (const z of FENCE_Z) {
+      let free = 0;
+      for (let x = 0; x < CL; x += 3) if (fenceFree(g, O, x, z, x + 3, z)) free++;
+      if (!best || free > best.free + 2) best = {
+        z,
+        free
+      };
+    }
+    const fz = best.z;
+    g.userData.fenceZ = fz;
+    for (const [t0, t1] of fenceAlong(g, O, [0, fz], [CL, fz])) {
+      if ((t1 - t0) * CL >= 9 && chance(.45)) graffiti(g, 1 + (rnd() * 2 | 0), t0 * CL + .5, t1 * CL - .5, fz + .09, .2, 2.3);
+    }
+    const pv = chunks[chunks.length - 1];
+    const pvInd = pv && pv !== g && pv.userData.biome === g.userData.biome && pv.userData.fenceZ !== undefined;
+    // a short step where the neighbouring chunk's line runs at the other depth
+    if (pvInd && pv.userData.fenceZ !== fz) fenceAlong(g, O, [.2, pv.userData.fenceZ], [.2, fz]);
+    // start of the zone: a side fence going back
+    if (!pvInd) fenceAlong(g, O, [.4, fz], [.4, FENCE_BACK]);
+    g.userData.fenceO = O; // kept for the end fence: once the chunk is merged its meshes no longer tell where things stand
+  }
+  /**
+   * F239e — Закриває промзону з боку виходу: бічний паркан у останньому відрізку промзони.
+   * Параметри: g — останній відрізок промзони.
+   */
+  function indFenceEnd(g) {
+    if (g.userData.fenceEnd || g.userData.fenceZ === undefined) return;
+    g.userData.fenceEnd = 1;
+    const O = g.userData.fenceO || fenceObstacles(g, null);
+    fenceAlong(g, O, [CL - .4, g.userData.fenceZ], [CL - .4, FENCE_BACK]);
+    g.userData.fenceO = null;
+  }
+  // ---- pipe rack along the industrial fence: runs over several chunks; at each end both pipes turn 90° —
+  // down into the ground, into the wall of a factory building, or to that wall and then down along it ----
+  let pipeRun = null;
+  let PIPE_P = .35; // chance that a pipe rack starts in an industrial chunk
+  const PIPES = [[-14.1, 3.4, .7], [-14.9, 3.5, .45]]; // z, height, radius of the two pipes
+  /**
+   * F239f — Відрізок труби між двома точками, що відрізняються лише по одній осі.
+   * Параметри: G; m; a; b; r.
+   */
+  function pipeSeg(G, m, a, b, r) {
+    const dx = b[0] - a[0];
+    const dy = b[1] - a[1];
+    const dz = b[2] - a[2];
+    const L = Math.abs(dx) + Math.abs(dy) + Math.abs(dz);
+    if (L < .05) return;
+    const p = new THREE.Mesh(PIPE, m);
+    p.scale.set(L, r * 2, r * 2);
+    p.position.set((a[0] + b[0]) / 2, (a[1] + b[1]) / 2, (a[2] + b[2]) / 2);
+    if (Math.abs(dz) > .01) p.rotation.y = Math.PI / 2;else if (Math.abs(dy) > .01) p.rotation.z = Math.PI / 2;
+    G.add(p);
+  }
+  /**
+   * F239g — Коліно труби в точці p.
+   * Параметри: G; m; p; r.
+   */
+  function pipeJoint(G, m, p, r) {
+    const j = new THREE.Mesh(GEO.blob, m);
+    j.position.set(p[0], p[1], p[2]);
+    j.scale.setScalar(r * 1.18);
+    G.add(j);
+  }
+  /**
+   * F239h — Кінець труби в точці x: 'down' — у землю, 'wall' — у стіну будівлі B, 'along' — до стіни й униз уздовж неї.
+   * Параметри: g; type; x; P — [z, y, r]; m; B.
+   */
+  function pipeEnd(g, type, x, P, m, B) {
+    const [z, y, r] = P;
+    pipeJoint(g, m, [x, y, z], r);
+    const clear = (z0, z1) => {
+      const W = g.userData.wtClear || (g.userData.wtClear = []);
+      for (let q = Math.max(z0, z1); q > Math.min(z0, z1); q -= 2) W.push([x, q, 2.6]);
+    };
+    if (type === 'down') {
+      pipeSeg(g, m, [x, y, z], [x, 0, z], r);
+      addBox(g, CONC, x, 0, z, r * 2.8, .35, r * 2.8);
+      return;
+    }
+    if (type === 'wall') {
+      pipeSeg(g, m, [x, y, z], [x, y, B.zf - .3], r);
+      const f = new THREE.Mesh(PIPE, MAT.dark);
+      f.scale.set(.25, r * 2.8, r * 2.8);
+      f.position.set(x, y, B.zf + .1);
+      f.rotation.y = Math.PI / 2;
+      g.add(f);
+      clear(z, B.zf);
+      return;
+    }
+    const zw = B.zf + r + .3;
+    pipeSeg(g, m, [x, y, z], [x, y, zw], r);
+    pipeJoint(g, m, [x, y, zw], r);
+    pipeSeg(g, m, [x, y, zw], [x, 0, zw], r);
+    for (let yy = .8; yy < y; yy += 1.6) addBox(g, MAT.dark, x, yy, (zw + B.zf) / 2, .12, .12, zw - B.zf + .1);
+    addBox(g, CONC, x, 0, zw, r * 2.8, .3, r * 2.8);
+    clear(z, zw);
+  }
+  /**
+   * F239i — Ділянка трубопроводу у відрізку промзони: початок, продовження або кінець прогону.
+   * Параметри: g.
+   */
+  function indPipes(g) {
+    const pv = chunks[chunks.length - 1];
+    const cont = !!(pipeRun && pv && pv.userData.pipeOpen);
+    g.userData.pipeCont = cont;
+    if (!cont) {
+      pipeRun = null;
+      if (!chance(PIPE_P)) return;
+      pipeRun = {
+        left: 1 + (rnd() * 4 | 0),
+        m: [chance(.5) ? RUSTY : CONC, chance(.5) ? RUSTY : CONC]
+      };
+    }
+    const R = pipeRun;
+    const B = g.userData.indBox;
+    const wallOk = B && B.zf < -17 && B.x1 - B.x0 > 8;
+    const endType = () => wallOk ? pick(['down', 'wall', 'along']) : 'down';
+    let xs = 0;
+    let xe = CL;
+    let sT = null;
+    let eT = null;
+    if (!cont) {
+      sT = endType();
+      xs = sT === 'down' ? rr(1, 12) : rr(B.x0 + 1, Math.min(B.x1 - 6, B.x0 + 14));
+    }
+    R.left--;
+    let nextOk = true;
+    if (!planOff) {
+      const N = PL.get(slotK(g.userData.ax) + 1);
+      nextOk = !!(N && N.b === 'industrial' && !N.busy && !N.ev);
+    }
+    if (R.left <= 0 || !nextOk) {
+      eT = endType();
+      if (eT !== 'down' && B.x1 - 1 > Math.max(xs + 8, B.x0 + 3)) xe = rr(Math.max(xs + 8, B.x0 + 3), B.x1 - 1);else {
+        eT = 'down';
+        xe = Math.min(CL - 1, Math.max(xs + 10, rr(26, 38)));
+      }
+    }
+    PIPES.forEach((P, i) => {
+      const m = R.m[i];
+      const a = xs + (sT ? i * 1.6 : 0);
+      const b = xe - (eT ? i * 1.6 : 0);
+      pipeSeg(g, m, [a, P[1], P[0]], [b, P[1], P[0]], P[2]);
+      if (sT) pipeEnd(g, sT, a, P, m, B);
+      if (eT) pipeEnd(g, eT, b, P, m, B);
+    });
+    for (let x = xs + 2; x < xe - 1; x += 8) {
+      addBox(g, MAT.metal, x - .8, 0, -14.4, .15, 3.3, .15).rotation.z = .2;
+      addBox(g, MAT.metal, x + .8, 0, -14.4, .15, 3.3, .15).rotation.z = -.2;
+    }
+    g.userData.pipeOpen = !eT;
+    g.userData.pipeM = R.m;
+    if (eT) pipeRun = null;
+  }
+  /**
+   * F239j — Якщо трубопровід дійшов до краю промзони, а далі його не продовжено, опускає труби в землю біля краю.
+   * Параметри: g — останній відрізок із трубами.
+   */
+  function pipeCap(g) {
+    if (!g.userData.pipeOpen) return;
+    g.userData.pipeOpen = false;
+    const G = new THREE.Group();
+    g.add(G);
+    PIPES.forEach((P, i) => pipeEnd(G, 'down', CL - .4 - i * .9, P, g.userData.pipeM[i]));
+    pipeRun = null;
+  }
+  function industrial(g, c, MIX) {
+    // the concrete fence is put up at the very end of the chunk (indFence), once everything it must avoid is in place
     indRailSlot(g, .6);
     const pvI = chunks[chunks.length - 1];
     const useGantry = !(pvI && (pvI.userData.indR || 0) > CL - 1) && chance(.3);
@@ -7043,8 +7471,20 @@
         const len = rr(24, 37);
         const d = rr(14, 20);
         const x0 = rr(1, 39 - len);
+        const nb = g.children.length;
         indBuilding(g, x0, -23 - d / 2 - rr(0, 7), len, d);
         g.userData.indR = x0 + len;
+        {
+          // footprint of the building in chunk coordinates (pipes may run into its front wall)
+          g.updateMatrixWorld(true);
+          const bb = new THREE.Box3();
+          for (const ch of g.children.slice(nb)) bb.expandByObject(ch);
+          g.userData.indBox = {
+            x0: bb.min.x - g.position.x,
+            x1: bb.max.x - g.position.x,
+            zf: bb.max.z - g.position.z
+          };
+        }
       }
       pack(g, n0);
     }
@@ -7103,18 +7543,7 @@
     }
     {
       const n0 = g.children.length;
-      if (chance(.35)) {
-        for (let x = 2; x < CL; x += 8) {
-          addBox(g, MAT.metal, x - .8, 0, -14.4, .15, 3.3, .15).rotation.z = .2;
-          addBox(g, MAT.metal, x + .8, 0, -14.4, .15, 3.3, .15).rotation.z = -.2;
-        }
-        for (const [y, z, r] of [[3.4, -14.1, .7], [3.5, -14.9, .45]]) {
-          const pp = new THREE.Mesh(PIPE, chance(.5) ? RUSTY : CONC);
-          pp.scale.set(CL, r * 2, r * 2);
-          pp.position.set(CL / 2, y, z);
-          g.add(pp);
-        }
-      }
+      indPipes(g);
       pack(g, n0);
     }
     {
@@ -7148,9 +7577,6 @@
   }
   const SILIC = L({
     color: 0xa8a090
-  });
-  const PANEL = L({
-    color: 0x7e7a70
   });
   const CONTC = [0x6a3a2a, 0x2a4a5a, 0x4a5a3a, 0x8a6a2a, 0x5a5a5e].map(
   /**
@@ -7245,42 +7671,7 @@
   function depot(g, c, MIX) {
     const adm = admSlot(g, 'depot');
     const admNear = adm && chance(.4);
-    {
-      const n0 = g.children.length;
-      const p = [];
-      const tilt = [];
-      for (let x = 0; x < CL; x += 3) {
-        if (chance(.12)) continue;
-        if (chance(.08)) {
-          tilt.push(x);
-          continue;
-        }
-        p.push([x + 1.5, 0, -11.8, 2.9, 2.3, .14]);
-      }
-      if (p.length) g.add(inst(GEO.box, PANEL, p));
-      for (const x of tilt) {
-        const m = addBox(g, PANEL, x + 1.5, 0, -11.8, 2.9, 2.3, .14);
-        m.rotation.x = rr(-.35, -.15);
-      }
-      if (chance(.6)) {
-        const sp = [];
-        let a = null;
-        for (const q of p) {
-          const x0 = q[0] - 1.45;
-          if (a && Math.abs(a[1] - x0) < .2) a[1] = x0 + 2.9;else {
-            a = [x0, x0 + 2.9];
-            sp.push(a);
-          }
-        }
-        for (const r of sp.filter(
-        /**
-         * F291 — Відбирає достатньо довгі вільні ділянки огорожі для графіті.
-         * Параметри: r.
-         */
-        r => r[1] - r[0] >= 5.8).slice(0, 3)) graffiti(g, 1, r[0] + .1, r[1] - .1, -11.8 + .085, .2, 2.2);
-      }
-      pack(g, n0);
-    }
+    // the concrete fence (same as in the industrial zone) is put up at the very end of the chunk (indFence)
     indRailSlot(g, .6);
     {
       const n0 = g.children.length;
@@ -7430,7 +7821,7 @@
    * Параметри: type.
    */
   function vehicle(type) {
-    const v = new THREE.Group();
+    const v = dyn(new THREE.Group(), true);
     let len;
     if (type === 'truck') {
       len = rr(6.5, 8);
@@ -7758,9 +8149,6 @@
     color: 0x404c54,
     emissive: 0x0a1014
   });
-  const MUD = new THREE.MeshLambertMaterial({
-    color: 0x4a4232
-  });
   const BUSHC = ['#4a5a2a', '#5a4a24', '#7a5a2a', '#3e4a2a', '#8a5a2a', '#6a3a22'];
   /**
    * F304 — Розміщує nb кущів і nt дерев уздовж берега near з урахуванням висоти ґрунту.
@@ -7939,12 +8327,6 @@
   const BRDG = L({
     color: 0x3c403a
   });
-  const vdepth =
-  /**
-   * F314 — Обчислює плавну глибину поперечної западини за координатою x.
-   * Параметри: x.
-   */
-  x => -9 * ease(Math.max(0, Math.min(1, (20 - Math.abs(x - 20)) / 9)));
   let valley = null;
   /**
    * F315 — Обчислює зміщення русла та зміну його ширини для плану долини V на координаті z.
@@ -8314,7 +8696,7 @@
    * F333 — Повертає модель птаха з окремими крилами для анімації.
    */
   function makeBird() {
-    const g = new THREE.Group();
+    const g = dyn(new THREE.Group());
     const b = new THREE.Mesh(BIRDB, CROWM);
     g.add(b);
     const w = [1, -1].map(
@@ -8372,7 +8754,6 @@
   }
   let flock = null;
   let flockT = rr(10, 30);
-  let bridgeLeft = 0;
   const LEPM = L({
     color: 0x5a5e60
   });
@@ -8738,7 +9119,7 @@
         } else if (ok && !roadNear(ax + 60, 110)) {
           ev.started = true;
           if (ev.kind === 'big') {
-            bigStart(g, ev.n, ev.top);
+            bigStart(g, ev.n, ev);
             return;
           }
           if (ev.kind === 'tunnel') {
@@ -8753,8 +9134,9 @@
     }
     if (planOff && stState === 'none' && !stationBuild && !valley && !g.userData.sid && g.userData.ax > nextBridgeAbs && g.userData.ax - lastLakeAbs > 500 && !roadNear(g.userData.ax + 60, 110) && !(chunks.length && chunks[chunks.length - 1].userData.road)) {
       if (forceBig) {
+        const o = forceBig;
         forceBig = false;
-        bigStart(g, 0, 'truss');
+        bigStart(g, 0, o);
         return;
       }
       if ((biome === 'field' || biome === 'forest' || biome === 'birch') && chance(.3)) {
@@ -8870,7 +9252,7 @@
         p.add(rod);
       }
       if (chance(.1)) {
-        const b = new THREE.Group();
+        const b = dyn(new THREE.Group());
         const bx = rr(5, 35);
         b.position.set(bx, -2.35, Math.min(nr(bx) - 8, rr(-55, -95)));
         addBox(b, MAT.wood, 0, 0, 0, 3, .35, 1.1);
@@ -8898,7 +9280,7 @@
         const x = rr(6, 32);
         for (const a of [-1.2, 1.2]) addBox(g, MAT.metal, x + a, 0, -22, .08, 2.2, .08);
         addBox(g, MAT.metal, x, 2.2, -22, 2.5, .08, .08);
-        const sw = new THREE.Group();
+        const sw = dyn(new THREE.Group());
         sw.position.set(x, 2.2, -22);
         addBox(sw, MAT.wood, 0, -1.6, 0, .6, .05, .3);
         for (const a of [-.25, .25]) addBox(sw, MAT.metal, a, -1.6, 0, .02, 1.6, .02);
@@ -8917,6 +9299,20 @@
    * chunks.
    * Параметри: x0; biome.
    */
+  /**
+   * F351a — Проміжок між двома різними поселеннями: лише дерева й кущі, з відступом від країв відрізка (там паркани й дороги сусідів).
+   * Параметри: g; c.
+   */
+  function bufFill(g, c) {
+    const MX = {
+      con: .15,
+      bir: .3
+    };
+    for (let i = 0; i < 12; i++) tree(c, rr(4, 36), rr(-16, -75), rr(5, 9), MX);
+    for (let i = 0; i < 12; i++) indBush(c, rr(3, 37), rr(-14, -60), rr(.7, 1.4));
+    for (let i = 0; i < 16; i++) sprite(c, rr(3, 37), rr(-75, -130), rr(7, 12), MX);
+    treeline(c, -130, -190, 20, MX);
+  }
   function makeChunk(x0, biome) {
     {
       const k = (x0 + odo) / 1000 % 18;
@@ -8956,6 +9352,7 @@
           pev.started = true;
           sid = pev.p;
           markAct(ax, 'siding');
+          if (sid.end === 'away' && sid.depot) markAct(ax + (sid.n - 1) * CL, 'depot'); // the turn to the depot
         } else {
           postpone(PS);
           pev = null;
@@ -8997,6 +9394,22 @@
       forceTun = false;
       forceTunNow = true;
     }
+    let buf = !!(PS && PS.buf);
+    if (!valley && !yardC) {
+      if (planOff && offBufN > 0) {
+        offBufN--;
+        buf = true;
+      } else if (!buf && !stationBuild && stState === 'none' && pv0 && !pv0.userData.buf && !pv0.userData.station && pv0.userData.biome !== biome && (SETTLE_B.includes(pv0.userData.biome) || SETTLE_B.includes(biome))) {
+        // a settlement met another place anyway (an event pulled one of them along): open the gap here
+        buf = true;
+        if (planOff) offBufN = BUF_N - 1;else for (let i = 0; i < BUF_N; i++) {
+          const T = getS(slotK(ax) + i);
+          T.b = 'field';
+          T.buf = 1;
+        }
+      }
+    }
+    if (buf) biome = 'field';
     deadNow = ax < deadUntil && ['forest', 'birch', 'cityforest'].includes(biome);
     if (!deadNow && ['forest', 'birch'].includes(biome) && ax > nextDeadAbs && !valley && chance(.08)) {
       deadUntil = ax + rr(40, 100);
@@ -9007,6 +9420,7 @@
     const g = new THREE.Group();
     g.position.x = x0;
     g.userData.biome = biome;
+    g.userData.buf = buf ? 1 : 0;
     g.userData.ax = ax;
     g.userData.pev = pev && ['river', 'road', 'rail', 'big', 'tunnel', 'overpass', 'crossing'].includes(pev.kind) ? pev : null;
     g.userData.PS = PS;
@@ -9125,8 +9539,27 @@
       if (shIdx === 4) stShift = false;
     }
     if (!stationBuild && !stShift) stNamePlan = null;
-    g.userData.wt = !st && !yardC && wtPlan(g, biome);
-    if (st) {} else if (yardC) yardChunk(g, c);else if (biome === 'forest' || biome === 'birch') {
+    g.userData.wt = !st && !yardC && !g.userData.buf && wtPlan(g, biome);
+    if (awayZone && g.userData.ax >= awayZone.ax1 - .1) awayZone = null;
+    if (!st && sid && sid.end === 'away' && sid.i === sid.n - 1 && !awayZone) {
+      if (['city', 'cityforest'].includes(biome)) {
+        sid.end = sid.wag1 ? 'dead' : pick(['dead', 'merge']);
+        if (plK0 !== null) getS(slotK(g.userData.ax)).act = null;
+      } else {
+        awayZone = awayMake(sid, g.userData.ax, biome);
+        markAct(g.userData.ax, awayZone.dep ? 'depot' : 'siding');
+        if (planOff) {
+          nextBridgeAbs = Math.max(nextBridgeAbs, awayZone.ax1 + 200);
+          nextStationAbs = Math.max(nextStationAbs, awayZone.ax1 + 100);
+        }
+      }
+    }
+    const awayHere = !st && !yardC && awayZone && g.userData.ax < awayZone.ax1 ? awayZone : null;
+    if (awayHere) {
+      g.userData.away = awayHere;
+      g.userData.vpart = 1;
+    }
+    if (st) {} else if (yardC) yardChunk(g, c);else if (awayHere) awayFill(g, c, MIX, awayHere);else if (g.userData.buf) bufFill(g, c);else if (biome === 'forest' || biome === 'birch') {
       for (let i = 0; i < 34; i++) tree(c, rr(0, CL), rr(-9, -40), rr(7, 15), MIX);
       for (let i = 0; i < 14; i++) tree(c, rr(0, CL), rr(-40, -70), rr(8, 16), MIX);
       for (let i = 0; i < 70; i++) sprite(c, rr(0, CL), rr(-68, -135), rr(9, 16), MIX);
@@ -9255,9 +9688,9 @@
       rg.userData.keep = 1;
       g.add(rg);
       addBox(rg, DIRT, 1, .0, -10.6, 2, .04, 3.4);
-      feeder(g);
+      feeder(g, 0);
     }
-    if (!g.userData.station && !['city', 'pgt', 'village', 'lake'].includes(biome) && !g.userData.road && !g.userData.river && (pv && pv.userData.road || biome === 'cityforest') && chance(biome === 'cityforest' ? .12 : .5)) garageCoop(g, 12, 38);
+    if (!g.userData.station && !g.userData.buf && !['city', 'pgt', 'village', 'lake'].includes(biome) && !g.userData.road && !g.userData.river && (pv && pv.userData.road || biome === 'cityforest') && chance(biome === 'cityforest' ? .12 : .5)) garageCoop(g, 12, 38);
     if (pv && pv.userData.road && !g.userData.road) {
       const rg = new THREE.Group();
       rg.userData.keep = 1;
@@ -9271,7 +9704,7 @@
     if (sid && !g.userData.station) sidingChunk(g, c);
     if (valley && !g.userData.station && valley.part > 0) (valley.kind === 'big' ? bigPart : valley.kind === 'tunnel' ? tunPart : valleyPart)(g);
     if (!g.userData.station) {
-      if (!g.userData.vpart) details(g, biome, c, MIX);
+      if (!g.userData.vpart && !g.userData.buf) details(g, biome, c, MIX);
       if (roads.length) clearRoads(g, c);
     } else if (!stShift && night < .35 && chance(.45)) crows(g);
     if (g.userData.wt && (biome === 'field' || biome === 'cityforest')) {
@@ -9281,6 +9714,16 @@
     } else if (g.userData.wt && (biome === 'village' || biome === 'pgt') && !g.userData.wtDone) wtPostpone();
     if (g.userData.sidLim) sidClear(g, c);
     if (g.userData.post) for (const f of g.userData.post) f(c);
+    if (!g.userData.station) {
+      const pvF = chunks[chunks.length - 1];
+      const FB = ['industrial', 'depot'];
+      if (FB.includes(g.userData.biome) && !g.userData.yard) indFence(g, c);
+      if (pvF && FB.includes(pvF.userData.biome) && pvF.userData.biome !== g.userData.biome) indFenceEnd(pvF);
+    }
+    {
+      const pvP = chunks[chunks.length - 1];
+      if (pvP && pvP.userData.pipeOpen && !g.userData.pipeCont) pipeCap(pvP);
+    }
     if (['industrial', 'depot'].includes(biome) || g.userData.yard) {
       g.updateMatrixWorld(true);
       const nt = g.userData.noTree || (g.userData.noTree = []);
@@ -9342,6 +9785,11 @@
        */
       q => q.p.parent === g || q.p.parent && q.p.parent.parent === g);
     }
+    if (g.userData.away) {
+      const Z = g.userData.away;
+      const ox = g.userData.ax - Z.ax0;
+      for (const k of ['tr', 'bt', 'bl', 'co', 'sp']) if (c[k]) c[k] = c[k].filter(t => !awayHit(Z, ox + t[0], t[2], k === 'bl' || k === 'co' ? t[3] + 1 : k === 'sp' ? t[3] * .3 + 1 : 3));
+    }
     if (g.userData.wtClear) for (const k of ['tr', 'bt', 'bl', 'co', 'sp']) if (c[k]) c[k] = c[k].filter(t => !g.userData.wtClear.some(w => Math.hypot(t[0] - w[0], t[2] - w[1]) < w[2]));
     if (c.sp.length) {
       if (g.userData.noTree) c.sp = c.sp.filter(
@@ -9383,6 +9831,7 @@
       };
     }
     deadNow = false;
+    mergeChunk(g);
     world.add(g);
     chunks.push(g);
     return g;
@@ -9567,6 +10016,31 @@
   const SPLIT_EXTRA = 14; // extra 40 m parts a split bridge needs for the land at both ends
   let splits = [];
   let forceBig = false; // test key NumPad 6 without the route plan
+  // big bridge over the sea is built from three independent choices (probabilities of the first option)
+  const BIG_SPLIT_P = .5; // layout: two single-track bridges ('split') or one narrow double-track bridge ('narrow')
+  const BIG_TRUSS_P = .5; // top: truss arches ('truss') or pylons with cables ('cable')
+  const BIG_STONE_P = .5; // bottom: stone walls with arches ('stone') or separate piers ('piers')
+  /**
+   * F371b — Доповнює вибір великого мосту випадковими значеннями для того, що не задано в o.
+   * Параметри: o.
+   */
+  function bigPick(o) {
+    o = o && typeof o === 'object' ? o : {};
+    return {
+      layout: o.layout || (chance(BIG_SPLIT_P) ? 'split' : 'narrow'),
+      top: o.top || (chance(BIG_TRUSS_P) ? 'truss' : 'cable'),
+      bottom: o.bottom || (chance(BIG_STONE_P) ? 'stone' : 'piers')
+    };
+  }
+  /**
+   * F371c — Описує вибір великого мосту словами для тестових повідомлень.
+   * Параметри: o.
+   */
+  function bigName(o) {
+    return (o.layout === 'split' ? 'два окремі мости' : 'вузький міст') + ', ' + (o.top === 'truss' ? 'балкові арки' : 'троси') + ', ' + (o.bottom === 'stone' ? 'кам\'яні арки знизу' : 'опори знизу');
+  }
+  const CABLE_RAMP = 200; // cable-stayed bridge: our track starts moving toward the oncoming one this far before the bridge, m
+  const CABLE_SHIFT = 1; // ... by this much, m (the far edge of that bridge is pulled in too, so the sea is visible)
   /**
    * F371a — Бічний зсув нашої колії від колії зустрічного потяга в точці d великого мосту (0 поза розведенням).
    * Параметри: V — опис мосту або запис splits; d — відстань від початку мосту, м.
@@ -9574,20 +10048,25 @@
   function splitOff(V, d) {
     const sp = V.split || V;
     const L = sp.L;
-    const u = Math.max(0, Math.min(1, (d - SPLIT_M) / SPLIT_RAMP, (L - SPLIT_M - d) / SPLIT_RAMP));
+    const r = sp.r || SPLIT_RAMP;
+    const m = sp.m === undefined ? SPLIT_M : sp.m;
+    const u = Math.max(0, Math.min(1, (d - m) / r, (L - m - d) / r));
     return sp.D * u * u * u * (u * (u * 6 - 15) + 10);
   }
   /**
-   * F372 — Починає великий міст завдовжки nn відрізків або випадкової довжини; top — тип ('truss' або 'cable').
-   * Параметри: g; nn; top.
+   * F372 — Починає великий міст завдовжки nn відрізків або випадкової довжини; o — вибір схеми, верху й низу (див. bigPick).
+   * Параметри: g; nn; o.
    */
-  function bigStart(g, nn, top) {
-    top = top || (chance(.5) ? 'truss' : 'cable');
-    const n = nn || 10 + (rnd() * 11 | 0) + (top === 'truss' ? SPLIT_EXTRA : 0);
+  function bigStart(g, nn, o) {
+    const ch = bigPick(o);
+    const sp = ch.layout === 'split';
+    const n = nn || 10 + (rnd() * 11 | 0) + (sp ? SPLIT_EXTRA : 0);
     markAct(g.userData.ax, 'big', {
       n
     });
-    const py = (n >= 15 ? [n / 3, 2 * n / 3] : [n / 2]).map(
+    const ne = n - (sp ? SPLIT_EXTRA : 0); // parts over the valley itself
+    const k0 = sp ? SPLIT_EXTRA / 2 : 0;
+    const py = (ne >= 15 ? [ne / 3, 2 * ne / 3] : [ne / 2]).map(k => k + k0).map(
     /**
      * F373 — Прив’язує позицію опори великого мосту до сітки відрізків по 40 метрів.
      * Параметри: k.
@@ -9598,11 +10077,13 @@
       n,
       py,
       ph: rr(0, 6.3),
-      top,
+      layout: ch.layout,
+      top: ch.top,
+      bottom: ch.bottom,
       part: 0,
       biome: g.userData.biome
     };
-    if (top === 'truss') {
+    if (sp) {
       valley.split = {
         a0: g.userData.ax,
         L: n * 40,
@@ -9610,6 +10091,15 @@
         land: SPLIT_M + SPLIT_RAMP + 15
       };
       splits.push(valley.split);
+    } else {
+      // narrow double-track bridge: our track eases 1 m toward the oncoming one over 200 m before the bridge and back after it
+      splits.push({
+        a0: g.userData.ax - CABLE_RAMP,
+        L: n * 40 + 2 * CABLE_RAMP,
+        D: -CABLE_SHIFT,
+        r: CABLE_RAMP,
+        m: 0
+      });
     }
     roads.push({
       ax: g.userData.ax + n * 20,
@@ -9635,40 +10125,20 @@
   function splitWater(V, d0) {
     return Math.max(bigY(V, d0), bigY(V, d0 + 40)) < -15.3;
   }
-  /**
-   * F373b — Додає в sg сегменти одноколійної балкової ферми вздовж відрізка між z = zc − 2.7 і zc + 2.7.
-   * Параметри: sg; zc.
-   */
-  function splitTruss(sg, zc) {
-    const TH = k => .7 + 6.4 + 3.4 * Math.sin(Math.PI * k / 8);
-    const zs = [zc - 2.7, zc + 2.7];
-    for (const z of zs) {
-      sg.push([0, .75, z, 40, .75, z, .5]);
-      sg.push([.5, .75, z, 5, TH(1), z, .5], [35, TH(7), z, 39.5, .75, z, .5]);
-      for (let k = 1; k < 7; k++) sg.push([k * 5, TH(k), z, k * 5 + 5, TH(k + 1), z, .5]);
-      for (let k = 1; k <= 7; k++) sg.push([k * 5, .75, z, k * 5, TH(k), z, .3]);
-      for (let k = 1; k < 7; k++) sg.push(k < 4 ? [k * 5, TH(k), z, k * 5 + 5, .75, z, .28] : [k * 5, .75, z, k * 5 + 5, TH(k + 1), z, .28]);
-    }
-    for (let k = 1; k <= 7; k++) sg.push([k * 5, TH(k), zs[0], k * 5, TH(k), zs[1], .22]);
-    for (let k = 1; k < 7; k++) sg.push([k * 5, TH(k), zs[0], k * 5 + 5, TH(k + 1), zs[1], .16], [k * 5, TH(k), zs[1], k * 5 + 5, TH(k + 1), zs[0], .16]);
-  }
   const SLOPEM = new THREE.MeshLambertMaterial({
     map: tGravel,
     side: THREE.DoubleSide
   });
   /**
-   * F373c — Частина розведеного мосту: на березі — наша колія на власному насипу, що відходить чи повертається;
-   * над водою — два окремі одноколійні балкові мости (зустрічний на z = −3.65, наш — на зсуві D).
-   * Параметри: V; G; g; d0; y0; y1; last.
+   * F373c — Берегова частина розведених мостів: наша колія на власному насипу відходить чи повертається, між коліями — дерева.
+   * Параметри: V; G; g; d0.
    */
-  function splitPart(V, G, g, d0, y0, y1, last) {
+  function splitPart(V, G, g, d0) {
     const SP = V.split;
     const zo = ZL(0);
-    const deck = splitDeck(V, d0);
-    const water = splitWater(V, d0);
     const pts = [];
     for (let x = 0; x <= 40.01; x += 2) pts.push([x, splitOff(SP, d0 + x), .8]);
-    if (!deck) {
+    {
       // land: our track on its own embankment; the near edge of the oncoming embankment gets a slope
       trackAlong(G, pts, true, false);
       const v = [];
@@ -9696,45 +10166,177 @@
           }
         }
       });
-      return;
     }
-    // two single-track bridges: piers and decks over the falling bank, truss arches only over the water
-    if (water) for (const ch of g.children.slice()) {
+  }
+  /**
+   * F373d — Додає в sg сегменти балкової арки-ферми між площинами zA і zB (уздовж 40-метрового відрізка).
+   * Параметри: sg; zA; zB.
+   */
+  function trussAt(sg, zA, zB) {
+    const TH = k => .7 + 6.4 + 3.4 * Math.sin(Math.PI * k / 8);
+    const zs = [zA, zB];
+    for (const z of zs) {
+      sg.push([0, .75, z, 40, .75, z, .5]);
+      sg.push([.5, .75, z, 5, TH(1), z, .5], [35, TH(7), z, 39.5, .75, z, .5]);
+      for (let k = 1; k < 7; k++) sg.push([k * 5, TH(k), z, k * 5 + 5, TH(k + 1), z, .5]);
+      for (let k = 1; k <= 7; k++) sg.push([k * 5, .75, z, k * 5, TH(k), z, .3]);
+      for (let k = 1; k < 7; k++) sg.push(k < 4 ? [k * 5, TH(k), z, k * 5 + 5, .75, z, .28] : [k * 5, .75, z, k * 5 + 5, TH(k + 1), z, .28]);
+    }
+    for (let k = 1; k <= 7; k++) sg.push([k * 5, TH(k), zA, k * 5, TH(k), zB, .22]);
+    for (let k = 1; k < 7; k++) sg.push([k * 5, TH(k), zA, k * 5 + 5, TH(k + 1), zB, .16], [k * 5, TH(k), zB, k * 5 + 5, TH(k + 1), zA, .16]);
+  }
+  /**
+   * F373e — Кам'яна стіна з аркою під настилом (нижня частина типу 'stone') завглибшки depth від z0.
+   * Параметри: G; y0; y1; ym; z0; depth.
+   */
+  function archWall(G, y0, y1, ym, z0, depth) {
+    const yb = Math.min(y0, y1, ym) - 1.2;
+    const top = -.55;
+    const sh = new THREE.Shape();
+    sh.moveTo(0, yb);
+    sh.lineTo(0, top);
+    sh.lineTo(40, top);
+    sh.lineTo(40, yb);
+    if (yb < -7) {
+      const ys = Math.max(-12, yb + .5);
+      const cr = -4.4;
+      sh.lineTo(38, yb);
+      sh.lineTo(38, ys);
+      for (let k = 1; k < 18; k++) {
+        const a = k / 18 * Math.PI;
+        sh.lineTo(20 + 18 * Math.cos(a), ys + (cr - ys) * Math.sin(a));
+      }
+      sh.lineTo(2, ys);
+      sh.lineTo(2, yb);
+    }
+    sh.lineTo(0, yb);
+    const eg = new THREE.ExtrudeGeometry(sh, {
+      depth,
+      bevelEnabled: false,
+      curveSegments: 1
+    });
+    eg.translate(0, 0, z0);
+    G.add(new THREE.Mesh(eg, STONEM));
+  }
+  /**
+   * F373f — Будує частину великого мосту над долиною з трьох незалежних виборів:
+   * V.layout — 'narrow' (один вузький міст на дві колії) або 'split' (два одноколійні мости);
+   * V.bottom — 'stone' (кам'яні стіни з арками) або 'piers' (окремі опори);
+   * V.top — 'cable' (пілони з тросами) або 'truss' (балкові арки, лише над водою).
+   * Параметри: V; G; g; d0; y0; y1; ym; last.
+   */
+  function bigDeck(V, G, g, d0, y0, y1, ym, last) {
+    const SP = V.split;
+    const zo = ZL(0);
+    const D = SP ? SP.D : 0;
+    const water = splitWater(V, d0);
+    const ends = last ? [[0, y0], [40, y1]] : [[0, y0]];
+    // cross-sections: each bridge is [zc, far plane, near plane]; narrow = the old double-track deck, pulled in on the far side
+    const B = SP ? [[zo, zo - 2.95, zo + 2.95], [D, D - 2.95, D + 2.95]] : [[-2.2, -6.6, 3.2]];
+    const cutw = (px, py, z, w) => {
+      const cw = new THREE.Mesh(GEO.box, STONEM);
+      cw.scale.set(w, -12.5 - py, w);
+      cw.position.set(px, py, z);
+      cw.rotation.y = Math.PI / 4;
+      G.add(cw);
+    };
+    if (V.top === 'truss' || SP && water) for (const ch of g.children.slice()) {
       if (ch !== G && ch.userData.keep && !ch.userData.ground && ch.position.x < 3.2 && ch.position.z < -3.2 && ch.position.z > -7.1) g.remove(ch);
     }
-    const D = SP.D;
-    for (const zc of [zo, D]) {
-      for (const [px, py] of last ? [[0, y0], [40, y1]] : [[0, y0]]) {
-        if (py > -1) continue;
-        addBox(G, STONEM, px, py - 1, zc, 4.2, -py + 1 - .55 - 1.2, 7);
-        addBox(G, CONC, px, -1.75, zc, 5, 1.2, 7.6);
-        if (py < -15.2) for (const z of [zc - 3.9, zc + 3.9]) {
-          const cw = new THREE.Mesh(GEO.box, STONEM);
-          cw.scale.set(3.4, -12.5 - py, 3.4);
-          cw.position.set(px, py, z);
-          cw.rotation.y = Math.PI / 4;
-          G.add(cw);
+    // ---- bottom ----
+    if (V.bottom === 'stone') {
+      if (SP) for (const [zc] of B) {
+        archWall(G, y0, y1, ym, zc - 2.95, 5.9);
+        for (const [px, py] of ends) if (py < -15.2) cutw(px, py, zc, 4);
+      } else {
+        archWall(G, y0, y1, ym, -7.3, 1.4);
+        for (const [px, py] of ends) {
+          if (py > -3) continue;
+          addBox(G, STONEM, px, py - 1.2, -5.7, 4.6, -py - 1.6, .5);
+          if (py < -15.2) cutw(px, py, -6.6, 3);
+        }
+        addBox(G, STONEM, 20, -1.5, -6.6, 40, .55, 1.9);
+      }
+    } else for (const [zc, za, zb] of B) for (const [px, py] of ends) {
+      if (py > -1) continue;
+      const w = zb - za + 1;
+      addBox(G, STONEM, px, py - 1, (za + zb) / 2, 4.2, -py + 1 - .55 - 1.2, w);
+      addBox(G, CONC, px, -1.75, (za + zb) / 2, 5, 1.2, w + .8);
+      if (py < -15.2) for (const z of [za - .9, zb + .9]) cutw(px, py, z, 3.4);
+    }
+    // ---- decks ----
+    if (SP) {
+      addBox(G, STONEM, 20, .25, D, 40, .55, 5.4);
+      addBox(G, CONC, 20, -.55, D, 40, .8, 5);
+      const pts = [];
+      for (let x = 0; x <= 40.01; x += 2) pts.push([x, splitOff(SP, d0 + x), .8]);
+      trackAlong(G, pts, false, false);
+      addBox(G, STONEM, 20, .25, zo, 40, .45, 5.4);
+    } else addBox(G, STONEM, 20, .25, -4.05, 40, .45, 3.7);
+    addBox(G, MAT.dark, 20, .85, -5.95, 40, .14, .25);
+    for (const [zc, za, zb] of B) for (const z of SP ? [za, zb] : [za]) {
+      const s = z < zc ? -1 : 1;
+      addBox(G, CONC, 20, -.55, z, 40, 1.4, 1.4);
+      addBox(G, BRDG, 20, -.45, z + s * .85, 40, 1.1, .5);
+      const rz = z - s * .5; // railing just inside the edge girder
+      const po = [];
+      for (let x = .5; x < CL; x += 1.6) po.push([x, .85, rz, .06, 1.05, .06]);
+      G.add(inst(GEO.box, MAT.metal, po));
+      addBox(G, MAT.metal, 20, 1.85, rz, 40, .06, .08);
+      addBox(G, MAT.metal, 20, 1.35, rz, 40, .04, .05);
+    }
+    if (!SP && V.top === 'truss') addBox(G, CONC, 20, -.55, 3.2, 40, 1.4, .8);
+    // ---- top ----
+    if (V.top === 'truss') {
+      if (water) {
+        const sg = [];
+        for (const [, za, zb] of B) trussAt(sg, za, zb);
+        segInst(G, TRUSSM, sg);
+      }
+      return;
+    }
+    if (!SP) for (const lx of [6.7, 20, 33.3]) {
+      addBox(G, MAT.metal, lx, .85, -6.4, .14, 6, .14);
+      addBox(G, MAT.metal, lx, 6.75, -5.85, .1, .1, 1.2);
+      addBox(G, TRACK_LAMP, lx, 6.6, -5.3, .5, .14, .3);
+      const gl = new THREE.Sprite(GLOWM);
+      gl.position.set(lx, 6.45, -5.3);
+      gl.scale.set(2.6, 2.6, 1);
+      G.add(gl);
+    }
+    // cables: narrow — two pylons with cross beams, cables on the far side; split — one pylon per bridge on its outer side
+    const Ht = SP ? 52 : 64;
+    const lo = SP ? SP.land + 8 : 8;
+    const hi = V.n * 40 - lo;
+    const planes = SP ? [[zo - 3.45, zo - 4.25], [D + 3.45, D + 4.25]] : [[-7.1, -7.9]];
+    const cv = [];
+    V.py.forEach((pd, pi) => {
+      const px = pd - d0;
+      if (pd >= d0 && pd < d0 + 40) {
+        for (const lz of SP ? planes.map(p => p[1]) : [-7.9, 3.9]) {
+          addBox(G, PYLM, px, -16, lz, 2.4, Ht + 16, 2.4);
+          addBox(G, PYLM, px, -16, lz, 4.2, 2, 4.2);
+        }
+        if (!SP) {
+          addBox(G, PYLM, px, 33, -2, 1.8, 2.4, 11.8);
+          addBox(G, PYLM, px, Ht - 1.5, -2, 1.8, 1.6, 11.8);
         }
       }
+      for (const sd of [-1, 1]) {
+        const R = V.py.length > 1 && (pi === 0 && sd > 0 || pi === 1 && sd < 0) ? Math.min(150, (V.py[1] - V.py[0]) / 2 - 6) : 150;
+        for (let k = 1; k <= 16; k++) {
+          const a = pd + sd * k * R / 16;
+          const ax = a - d0;
+          if (ax < 0 || ax >= 40 || a < lo || a > hi) continue;
+          for (const [za, zp] of planes) cv.push(ax, .65, za, px + sd * .6, Ht - 3 - k * 1.7 * Ht / 64, zp);
+        }
+      }
+    });
+    if (cv.length) {
+      const cg = new THREE.BufferGeometry();
+      cg.setAttribute('position', new THREE.Float32BufferAttribute(cv, 3));
+      G.add(new THREE.LineSegments(cg, CABLEM));
     }
-    if (water) {
-      const sg = [];
-      splitTruss(sg, zo);
-      splitTruss(sg, D);
-      segInst(G, TRUSSM, sg);
-    } else for (const zc of [zo, D]) for (const s of [-1, 1]) {
-      // plain deck girders with a low railing where there are no arches
-      addBox(G, CONC, 20, -.3, zc + s * 2.75, 40, 1.15, .35);
-      const po = [];
-      for (let x = .5; x < 40; x += 2) po.push([x, .85, zc + s * 2.75, .06, .9, .06]);
-      G.add(inst(GEO.box, MAT.metal, po));
-      addBox(G, MAT.metal, 20, 1.72, zc + s * 2.75, 40, .06, .07);
-    }
-    // our deck and track, and a girder along the near edge of the oncoming deck
-    addBox(G, STONEM, 20, .25, D, 40, .55, 5.4);
-    addBox(G, CONC, 20, -.55, D, 40, .8, 5);
-    trackAlong(G, pts, false, false);
-    addBox(G, CONC, 20, -.55, -.75, 40, 1.4, .6);
   }
   /**
    * F374 — Будує наступну частину великого мосту з опорами, долиною, водою й суднами.
@@ -9780,141 +10382,7 @@
       w.position.y = -15.5;
       G.add(w);
     }
-    // stone arch wall under the outer deck
-    if (V.top !== 'truss') {
-      const yb = Math.min(y0, y1, ym) - 1.2;
-      const top = -.55;
-      const sh = new THREE.Shape();
-      sh.moveTo(0, yb);
-      sh.lineTo(0, top);
-      sh.lineTo(40, top);
-      sh.lineTo(40, yb);
-      if (yb < -7) {
-        const ys = Math.max(-12, yb + .5);
-        const cr = -4.4;
-        sh.lineTo(38, yb);
-        sh.lineTo(38, ys);
-        for (let k = 1; k < 18; k++) {
-          const a = k / 18 * Math.PI;
-          sh.lineTo(20 + 18 * Math.cos(a), ys + (cr - ys) * Math.sin(a));
-        }
-        sh.lineTo(2, ys);
-        sh.lineTo(2, yb);
-      }
-      sh.lineTo(0, yb);
-      const eg = new THREE.ExtrudeGeometry(sh, {
-        depth: 3.3,
-        bevelEnabled: false,
-        curveSegments: 1
-      });
-      eg.translate(0, 0, -9.2);
-      G.add(new THREE.Mesh(eg, STONEM));
-      for (const [px, py] of last ? [[0, y0], [40, y1]] : [[0, y0]]) {
-        if (py > -3) continue;
-        addBox(G, STONEM, px, py - 1.2, -5.7, 4.6, -1.2 - py + 1.2 - 1.6, .5);
-        if (py < -15.2) for (const z of [-9.2, -5.9]) {
-          const cw = new THREE.Mesh(GEO.box, STONEM);
-          cw.scale.set(3, -12.5 - py, 3);
-          cw.position.set(px, py, z);
-          cw.rotation.y = Math.PI / 4;
-          G.add(cw);
-        }
-      }
-      addBox(G, STONEM, 20, -1.5, -7.55, 40, .55, 3.9);
-    } else if (SP) {
-      splitPart(V, G, g, d0, y0, y1, last);
-    } else {
-      for (const [px, py] of last ? [[0, y0], [40, y1]] : [[0, y0]]) {
-        if (py > -1) continue;
-        addBox(G, STONEM, px, py - 1, -3.6, 4.2, -py + 1 - .55 - 1.2, 11.8);
-        addBox(G, CONC, px, -1.75, -3.6, 5, 1.2, 12.6);
-        if (py < -15.2) for (const z of [-9.5, 2.3]) {
-          const cw = new THREE.Mesh(GEO.box, STONEM);
-          cw.scale.set(3.4, -12.5 - py, 3.4);
-          cw.position.set(px, py, z);
-          cw.rotation.y = Math.PI / 4;
-          G.add(cw);
-        }
-      }
-      for (const ch of g.children.slice()) {
-        if (ch !== G && ch.userData.keep && !ch.userData.ground && ch.position.x < 3.2 && ch.position.z < -3.2 && ch.position.z > -7.1) g.remove(ch);
-      }
-      const sg = [];
-      const TH =
-      /**
-       * F377 — Повертає висоту верхнього поясу аркової ферми за індексом k.
-       * Параметри: k.
-       */
-      k => .7 + 6.4 + 3.4 * Math.sin(Math.PI * k / 8);
-      const zs = [-6.35, 3.2];
-      for (const z of zs) {
-        sg.push([0, .75, z, 40, .75, z, .5]);
-        sg.push([.5, .75, z, 5, TH(1), z, .5], [35, TH(7), z, 39.5, .75, z, .5]);
-        for (let k = 1; k < 7; k++) sg.push([k * 5, TH(k), z, k * 5 + 5, TH(k + 1), z, .5]);
-        for (let k = 1; k <= 7; k++) sg.push([k * 5, .75, z, k * 5, TH(k), z, .3]);
-        for (let k = 1; k < 7; k++) sg.push(k < 4 ? [k * 5, TH(k), z, k * 5 + 5, .75, z, .28] : [k * 5, .75, z, k * 5 + 5, TH(k + 1), z, .28]);
-      }
-      for (let k = 1; k <= 7; k++) sg.push([k * 5, TH(k), zs[0], k * 5, TH(k), zs[1], .22]);
-      for (let k = 1; k < 7; k++) sg.push([k * 5, TH(k), zs[0], k * 5 + 5, TH(k + 1), zs[1], .16], [k * 5, TH(k), zs[1], k * 5 + 5, TH(k + 1), zs[0], .16]);
-      segInst(G, TRUSSM, sg);
-    }
-    // deck: thin slab under the other track, the outer girder, walkway railing and lamps
-    if (!SP || splitDeck(V, d0)) {
-    addBox(G, STONEM, 20, .25, -4.05, 40, .45, 3.7);
-    addBox(G, CONC, 20, -.55, -7.55, 40, 1.4, 3.3);
-    addBox(G, MAT.dark, 20, .85, -5.95, 40, .14, .25);
-    {
-      const po = [];
-      for (let x = .5; x < CL; x += 1.6) po.push([x, .85, -9.05, .06, 1.05, .06]);
-      G.add(inst(GEO.box, MAT.metal, po));
-      addBox(G, MAT.metal, 20, 1.85, -9.05, 40, .06, .08);
-      addBox(G, MAT.metal, 20, 1.35, -9.05, 40, .04, .05);
-    }
-    addBox(G, BRDG, 20, -.45, -10.05, 40, 1.1, 1.7);
-    }
-    for (const lx of V.top === 'truss' ? [] : [6.7, 20, 33.3]) {
-      addBox(G, MAT.metal, lx, .85, -9.3, .14, 6, .14);
-      addBox(G, MAT.metal, lx, 6.75, -8.75, .1, .1, 1.2);
-      addBox(G, TRACK_LAMP, lx, 6.6, -8.2, .5, .14, .3);
-      const gl = new THREE.Sprite(GLOWM);
-      gl.position.set(lx, 6.45, -8.2);
-      gl.scale.set(2.6, 2.6, 1);
-      G.add(gl);
-    }
-    if (V.top !== 'truss') {
-      const Ht = 64;
-      const cv = [];
-      V.py.forEach(
-      /**
-       * F378 — Будує опори й елементи великого мосту в межах поточного відрізка.
-       * Параметри: pd; pi.
-       */
-      (pd, pi) => {
-        const px = pd - d0;
-        if (pd >= d0 && pd < d0 + 40) {
-          for (const lz of [-11.4, 3.9]) {
-            addBox(G, PYLM, px, -16, lz, 2.4, Ht + 16, 2.4);
-            addBox(G, PYLM, px, -16, lz, 4.2, 2, 4.2);
-          }
-          addBox(G, PYLM, px, 33, -3.75, 1.8, 2.4, 15.3);
-          addBox(G, PYLM, px, Ht - 1.5, -3.75, 1.8, 1.6, 15.3);
-        }
-        for (const sd of [-1, 1]) {
-          const R = V.py.length > 1 && (pi === 0 && sd > 0 || pi === 1 && sd < 0) ? Math.min(150, (V.py[1] - V.py[0]) / 2 - 6) : 150;
-          for (let k = 1; k <= 16; k++) {
-            const a = pd + sd * k * R / 16;
-            const ax = a - d0;
-            if (ax < 0 || ax >= 40 || a < 8 || a > V.n * 40 - 8) continue;
-            cv.push(ax, .65, -10.6, px + sd * .6, Ht - 3 - k * 1.7, -11.4);
-          }
-        }
-      });
-      if (cv.length) {
-        const cg = new THREE.BufferGeometry();
-        cg.setAttribute('position', new THREE.Float32BufferAttribute(cv, 3));
-        G.add(new THREE.LineSegments(cg, CABLEM));
-      }
-    }
+    if (V.split && !splitDeck(V, d0)) splitPart(V, G, g, d0);else bigDeck(V, G, g, d0, y0, y1, ym, last);
     // reeds at the waterline, trees on the dry banks
     if (Math.max(y0, y1) > -19 && Math.min(y0, y1) < -1) {
       const reeds = [];
@@ -9967,7 +10435,7 @@
     if (ym < -16.5) {
       const boats = [];
       if (chance(.35)) {
-        const b = new THREE.Group();
+        const b = dyn(new THREE.Group());
         const big = chance(.4);
         if (big) {
           addBox(b, MAT.dark, 0, -.4, 0, 2.4, 1.3, 7);
@@ -9990,7 +10458,7 @@
         });
       }
       if (chance(.3)) {
-        const b = new THREE.Group();
+        const b = dyn(new THREE.Group());
         const Lh = rr(22, 40);
         addBox(b, pick([MAT.dark, RUSTY, BRICKM]), 0, -.8, 0, Lh, 2.6, 5.5);
         addBox(b, DM.white, -Lh * .3, 1.8, 0, Lh * .22, 3.2, 4.4);
@@ -10025,7 +10493,7 @@
       });
     }
     // rarely someone on the walkway
-    if ((!SP || splitDeck(V, d0)) && chance(.14)) {
+    if (V.walkway && chance(.14)) {
       const n = 1 + (chance(.3) ? 1 : 0);
       for (let k = 0; k < n; k++) {
         const st = chance(.45);
@@ -11021,7 +11489,7 @@
       });
     }
     if (chance(.7)) {
-      const f = new THREE.Group();
+      const f = dyn(new THREE.Group());
       f.position.set(rr(x0 + 3, x0 + len - 3), Y0, zf + 1.6);
       ch.add(f);
       addBox(f, YELM, 0, .18, 0, 1.6, .75, 1.05);
@@ -11614,6 +12082,12 @@
   let plTop = -1;
   let pB = null;
   let pRun = 0;
+  // a settlement (village / town / SMT) never touches any other kind of place: 120 m of trees and bushes go between them
+  const SETTLE_B = ['city', 'village', 'pgt'];
+  const BUF_N = 3; // 40 m parts of the gap
+  let pNextB = null;
+  let pBuf = false;
+  let offBufN = 0;
   let stNamePlan = null;
   const PL = new Map();
   const PN = {
@@ -11713,6 +12187,7 @@
     }
     getS(k).ev = e;
     e.k = k;
+    if (e.zoneB) for (let i = k + e.zoneK; i < k + n; i++) getS(i).b = e.zoneB;
     if (e.kind === 'station' || e.kind === 'yard' || e.kind === 'siding') for (let i = k + n; i < k + n + 2; i++) {
       const T = getS(i);
       if (!T.busy && !T.ev) T.quiet = 1;
@@ -11754,8 +12229,8 @@
         b: ['forest', 'birch'].includes(S.b) ? S.b : 'forest'
       });
     } else if (kind === 'big') {
-      e.top = o.top || (chance(.5) ? 'truss' : 'cable');
-      e.n = 10 + (rnd() * 11 | 0) + (e.top === 'truss' ? SPLIT_EXTRA : 0);
+      Object.assign(e, bigPick(o));
+      e.n = 10 + (rnd() * 11 | 0) + (e.layout === 'split' ? SPLIT_EXTRA : 0);
     } else if (kind === 'river' || kind === 'road' || kind === 'rail') e.n = 3;else if (kind === 'yard') {
       e.n = 13 + (rnd() * 5 | 0);
       e.b = 'yard';
@@ -11768,6 +12243,14 @@
       }
       e.p = sp;
       e.n = sp.n;
+      if (sp.end === 'away') {
+        // keep the chunks the branch crosses free of bridges, roads and other events
+        e.n = sp.n + Math.ceil(awayLen(Object.assign({}, sp, {
+          depot: true
+        })) / 40);
+        e.zoneB = ['depot', 'industrial', 'field', 'forest', 'birch'].includes(S.b) ? S.b : 'field';
+        e.zoneK = sp.n - 1;
+      }
     }
     return e;
   }
@@ -11780,7 +12263,10 @@
     const ax = S.ax;
     if (!S.b) {
       if (pRun <= 0 || !pB) {
-        let b = pickBiome(pB, ax);
+        const fromBuf = !!pNextB; // the place that comes right after a gap must not get another gap in front of it
+        let b = pNextB || pickBiome(pB, ax);
+        pNextB = null;
+        pBuf = false;
         if (b === 'yard') {
           if (slotFree(k, 18)) {
             const e = makeEv('yard', {}, k);
@@ -11792,10 +12278,19 @@
           }
           b = pickBiome('yard', ax);
         }
+        if (!fromBuf && pB && b !== pB && (SETTLE_B.includes(pB) || SETTLE_B.includes(b))) {
+          pNextB = b;
+          b = 'field';
+          pBuf = true;
+        }
         pB = b;
-        pRun = Math.round(rr(450, 1050) / CL);
+        pRun = pBuf ? BUF_N : Math.round(rr(450, 1050) / CL);
       }
       S.b = pB;
+      if (pBuf) {
+        S.buf = 1;
+        S.quiet = 1;
+      }
       pRun--;
       if (S.b === 'lake' && ax < Math.max(PN.noLake, noLakeUntil)) S.b = 'field';
     }
@@ -12084,18 +12579,36 @@
     c.beginPath();
     c.rect(m, 0, W - 2 * m, H);
     c.clip();
+    // the gap of trees around a settlement is not a place of its own: on the strip the two neighbours simply meet in its middle
+    const pieces = [];
+    for (const S of sl) {
+      if (!S.buf) {
+        pieces.push([S.b, S.ax, S.ax + CL]);
+        continue;
+      }
+      let k0 = S.k;
+      while (k0 > S.k - 8 && PL.get(k0 - 1) && PL.get(k0 - 1).buf) k0--;
+      let k1 = S.k;
+      while (k1 < S.k + 8 && PL.get(k1 + 1) && PL.get(k1 + 1).buf) k1++;
+      const A = PL.get(k0 - 1);
+      const Bn = PL.get(k1 + 1);
+      const bA = A && A.b || Bn && Bn.b || S.b;
+      const bB = Bn && Bn.b || bA;
+      const mid = (slotAx(k0) + slotAx(k1) + CL) / 2;
+      if (S.ax + CL <= mid) pieces.push([bA, S.ax, S.ax + CL]);else if (S.ax >= mid) pieces.push([bB, S.ax, S.ax + CL]);else pieces.push([bA, S.ax, mid], [bB, mid, S.ax + CL]);
+    }
     let run = null;
     const runs = [];
-    for (const S of sl) {
-      if (run && run.b === S.b && run.k1 === S.k - 1) {
-        run.k1 = S.k;
-        run.x1 = X(S.ax + CL);
+    for (const [b, a0, a1] of pieces) {
+      if (run && run.b === b && Math.abs(run.a1 - a0) < .5) {
+        run.a1 = a1;
+        run.x1 = X(a1);
       } else {
         run = {
-          b: S.b,
-          k1: S.k,
-          x0: X(S.ax),
-          x1: X(S.ax + CL)
+          b,
+          a1,
+          x0: X(a0),
+          x1: X(a1)
         };
         runs.push(run);
       }
@@ -12237,6 +12750,21 @@
         c.lineTo(5, -4);
         c.lineTo(8, -4);
         c.stroke();
+      } else if (k === 'depot') {
+        // the main line, a branch curving off it and a small shed with a gable
+        c.moveTo(-9, 5);
+        c.lineTo(9, 5);
+        c.moveTo(-7, 5);
+        c.quadraticCurveTo(-2, 5, 0, 0);
+        c.stroke();
+        c.beginPath();
+        c.moveTo(1, 0);
+        c.lineTo(1, -5);
+        c.lineTo(5, -8.5);
+        c.lineTo(9, -5);
+        c.lineTo(9, 0);
+        c.closePath();
+        c.stroke();
       } else if (k === 'overpass') {
         c.fillRect(-8, -3, 16, 2.4);
         c.moveTo(-5, -1);
@@ -12249,9 +12777,19 @@
     };
     const evs = [];
     for (const S of sl) {
+      if (S.act && S.act.kind === 'depot' && !S.done) evs.push({
+        k: 'depot',
+        ax: S.ax,
+        n: 1
+      });
       const e = S.done ? S.act : S.ev && S.ev.start && !S.ev.started ? S.ev : null;
       if (!e) continue;
-      const n = e.n || (e.kind === 'station' ? e.island ? 5 : 3 : 1);
+      if (e.kind === 'siding' && e.p && e.p.end === 'away' && e.p.depot && !S.done) evs.push({
+        k: 'depot',
+        ax: S.ax + (e.p.n - 1) * CL,
+        n: 1
+      });
+      const n = e.kind === 'siding' && e.p ? e.p.n : e.n || (e.kind === 'station' ? e.island ? 5 : 3 : 1);
       evs.push({
         k: e.kind === 'station' && e.island ? 'island' : e.kind,
         ax: S.ax,
@@ -12406,6 +12944,115 @@
     }
   }
   let SHARED = null;
+  /* ---------- merging the static meshes of a chunk: one draw call per material instead of one per box ---------- */
+  /**
+   * F497a — Позначає об'єкт як рухомий або змінюваний (люди, тварини, техніка, сигнали): його не об'єднують зі статикою.
+   * Параметри: o.
+   */
+  function dyn(o, rigid) {
+    o.userData.dyn = 1;
+    if (rigid) o.userData.rigid = 1;
+    return o;
+  }
+  const MERGE_ON = true; // false = keep every mesh separate (for debugging)
+  /**
+   * F497b — Об'єднує всі нерухомі звичайні моделі відрізка g з однаковим матеріалом в одну модель.
+   * Не чіпає рухомі об'єкти (dyn), прозорі матеріали, спрайти, точки, лінії, інстансовані моделі, землю й приховане.
+   * Параметри: g.
+   */
+  function mergeChunk(g, rigid) {
+    if (!MERGE_ON) return;
+    g.updateMatrixWorld(true);
+    const inv = new THREE.Matrix4().copy(g.matrixWorld).invert();
+    const M = new THREE.Matrix4();
+    const N = new THREE.Matrix3();
+    const V = new THREE.Vector3();
+    const bins = new Map();
+    const rm = [];
+    const walk = o => {
+      if (!o.visible) return;
+      if (o !== g && o.userData.dyn) {
+        // a rigid moving thing (vehicle, locomotive with its wagons) gets merged inside itself and keeps moving as one piece
+        if (!o.userData.rigid) return;
+        if (!rigid) {
+          mergeChunk(o, true);
+          return;
+        }
+      }
+      if (o.isMesh && !o.isInstancedMesh && !o.isSkinnedMesh && o !== g && !(o.userData.dyn && !o.userData.rigid) && !o.userData.ground && !o.userData.ownMat && !o.renderOrder && o.geometry && o.geometry.attributes.position && !o.geometry.morphAttributes.position) {
+        const mats = Array.isArray(o.material) ? o.material : null;
+        if (!(mats ? mats.some(m => m.transparent) : o.material.transparent)) {
+          rm.push(o);
+          M.multiplyMatrices(inv, o.matrixWorld);
+          N.getNormalMatrix(M);
+          const flip = M.determinant() < 0;
+          let geo = o.geometry.index ? o.geometry.toNonIndexed() : o.geometry;
+          const P = geo.attributes.position;
+          const Nm = geo.attributes.normal;
+          const U = geo.attributes.uv;
+          const ranges = mats ? (geo.groups.length ? geo.groups : [{
+            start: 0,
+            count: P.count,
+            materialIndex: 0
+          }]) : [{
+            start: 0,
+            count: P.count,
+            materialIndex: 0
+          }];
+          for (const r of ranges) {
+            const mat = mats ? mats[r.materialIndex] : o.material;
+            if (!mat) continue;
+            let b = bins.get(mat);
+            if (!b) bins.set(mat, b = {
+              p: [],
+              n: [],
+              u: []
+            });
+            const end = Math.min(P.count, r.start + r.count);
+            for (let t = r.start; t + 2 < end; t += 3) {
+              const ord = flip ? [t, t + 2, t + 1] : [t, t + 1, t + 2];
+              for (const i of ord) {
+                V.fromBufferAttribute(P, i).applyMatrix4(M);
+                b.p.push(V.x, V.y, V.z);
+                if (Nm) {
+                  V.fromBufferAttribute(Nm, i).applyMatrix3(N).normalize();
+                  b.n.push(V.x, V.y, V.z);
+                } else b.n.push(0, 1, 0);
+                if (U) b.u.push(U.getX(i), U.getY(i));else b.u.push(0, 0);
+              }
+            }
+          }
+          if (geo !== o.geometry) geo.dispose();
+        }
+      }
+      for (const ch of o.children) walk(ch);
+    };
+    walk(g);
+    if (rm.length < 2) return;
+    if (!SHARED) freeTree(new THREE.Group()); // builds the shared-geometry set
+    for (const o of rm) {
+      o.parent.remove(o);
+      if (!SHARED.has(o.geometry)) o.geometry.dispose();
+    }
+    for (const [mat, b] of bins) {
+      const geo = new THREE.BufferGeometry();
+      geo.setAttribute('position', new THREE.Float32BufferAttribute(b.p, 3));
+      geo.setAttribute('normal', new THREE.Float32BufferAttribute(b.n, 3));
+      geo.setAttribute('uv', new THREE.Float32BufferAttribute(b.u, 2));
+      geo.computeBoundingSphere();
+      const m = new THREE.Mesh(geo, mat);
+      m.userData.merged = 1;
+      g.add(m);
+    }
+    // drop the groups that are now empty
+    const prune = o => {
+      for (const ch of o.children.slice()) {
+        prune(ch);
+        if (!ch.children.length && !ch.isMesh && !ch.isPoints && !ch.isLine && !ch.isSprite && !ch.userData.dyn && ch.type === 'Group') o.remove(ch);
+      }
+    };
+    prune(g);
+  }
   /**
    * F498 — Звільняє ресурси дерева об’єктів root, відокремлюючи спільні геометрії від локальних.
    * Параметри: root.
@@ -13693,15 +14340,14 @@
     }
     if (e.code === 'Numpad6' && !e.repeat) {
       if (valley && valley.kind === 'big' || forceBig) toast('Тест: великий міст уже попереду');else if (!planOff) {
-        insertEvent('big', {
-          top: 'truss'
-        });
-        toast('Тест: розведені мости через море попереду');
+        const o = bigPick();
+        insertEvent('big', o);
+        toast('Тест: великий міст попереду — ' + bigName(o));
       } else {
-        forceBig = true;
+        forceBig = bigPick();
         nextBridgeAbs = 0;
         lastLakeAbs = -1e9;
-        toast('Тест: створюю розведені мости…');
+        toast('Тест: створюю великий міст — ' + bigName(forceBig));
       }
       return;
     }
@@ -13818,7 +14464,6 @@
   let clackT = 0;
   let clackN = 0;
   let bump = 0;
-  let gust = 0;
   /**
    * F552 — Оновлює всі системи симуляції, малює кадр і планує наступний; now — час requestAnimationFrame
    * у мілісекундах.
