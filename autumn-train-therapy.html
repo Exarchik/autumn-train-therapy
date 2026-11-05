@@ -1,3 +1,4 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
 <!doctype html>
 <!--
   AUTUMN TRAIN THERAPY — версія для редагування.
@@ -266,6 +267,74 @@
       display:none
     }
     
+    /* stereo focus slider: a small strip at the top centre, only in stereo mode */
+    #focus {
+      display:none;
+      position:fixed;
+      left:50%;
+      top:8px;
+      transform:translateX(-50%);
+      z-index:6;
+      align-items:center;
+      gap:8px;
+      padding:4px 10px;
+      border-radius:14px;
+      background:rgba(16,18,20,.55);
+      color:#e8e4d8;
+      font:600 11px system-ui,sans-serif;
+      opacity:.75;
+      transition:opacity .4s;
+      touch-action:none
+    }
+    
+    body.stereo.tuning #focus {
+      display:flex
+    }
+    
+    body.stereo #c {
+      image-rendering:auto
+    }
+    
+    body.stereo .scan {
+      display:none
+    }
+    
+    #focus.idle {
+      opacity:.25
+    }
+    
+    #focus span {
+      white-space:nowrap
+    }
+    
+    #focus .sep {
+      margin-left:6px;
+      padding-left:10px;
+      border-left:1px solid rgba(232,228,216,.3)
+    }
+    
+    #focus input {
+      width:min(22vw,170px);
+      margin:0;
+      accent-color:#f0c860
+    }
+    
+    #focus output {
+      min-width:2.8em;
+      text-align:right;
+      font-variant-numeric:tabular-nums
+    }
+    
+    #focus button {
+      font:inherit;
+      color:inherit;
+      background:none;
+      border:1px solid rgba(232,228,216,.4);
+      border-radius:10px;
+      padding:1px 7px;
+      cursor:pointer
+    }
+    
     
     #menu button {
       width:48px;
@@ -309,14 +378,14 @@
     <div class="vigR">
     </div>
     <nav id="menu" hidden aria-label="Меню">
-      <button id="mStereo" type="button" aria-label="Стерео-режим" aria-pressed="false" title="Стерео-режим">
+      <button id="mStereo" hidden type="button" aria-label="Стерео-режим" aria-pressed="false" title="Стерео-режим">
         <svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
           <circle cx="6.5" cy="14" r="3.6"/>
           <circle cx="17.5" cy="14" r="3.6"/>
           <path d="M10.1 13.4q1.9-1.6 3.8 0M2.9 13.2 4.6 7.5h2M21.1 13.2 19.4 7.5h-2"/>
         </svg>
       </button>
-      <button id="mLens" type="button" aria-label="Корекція лінз VR-окулярів" aria-pressed="false" title="Корекція лінз">
+      <button id="mLens" type="button" aria-label="3D для VR-окулярів" aria-pressed="false" title="3D для VR-окулярів">
         <svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">
           <path d="M3 7.5Q3 5 5.5 5h13Q21 5 21 7.5v8q0 2.5-2.5 2.5h-3.2l-1.8-2.6q-1.5-1.8-3 0L8.7 18H5.5Q3 18 3 15.5z"/>
           <circle cx="8" cy="11" r="2.3"/>
@@ -338,6 +407,25 @@
     </nav>
     <canvas id="route" hidden>
     </canvas>
+    <div id="focus" aria-label="Фокус стерео">
+      <span aria-hidden="true">
+        ◂ ▸
+      </span>
+      <input id="focusR" type="range" min="-30" max="30" step="0.5" value="6.5" aria-label="Точка фокусування">
+      <output id="focusV" for="focusR">
+        +6.5
+      </output>
+      <span class="sep" aria-hidden="true">
+        FOV
+      </span>
+      <input id="fovR" type="range" min="40" max="120" step="1" value="66" aria-label="Кут огляду камер">
+      <output id="fovV" for="fovR">
+        66°
+      </output>
+      <button id="focus0" type="button" aria-label="Скинути фокус і кут огляду до значень за замовчуванням">
+        ↺
+      </button>
+    </div>
     <div id="settings" hidden role="dialog" aria-modal="true" aria-labelledby="setTitle">
       <div class="box">
         <div class="head">
@@ -449,8 +537,9 @@
   const STEREO_SIDE = 1; // where the second (right-half) camera sits: 1 = to the right (correct for VR glasses), -1 = to the left (cross-eyed viewing)
   const LENS_K1 = .22;
   const LENS_K2 = .24; // barrel distortion for VR lenses (bigger = stronger "fish-eye")
-  const LENS_FOV = 88; // vertical field of view of each eye when lens mode is on, degrees
-  const LENS_CA = .012; // colour fringe correction for cheap lenses (0 = off)
+  const LENS_FOV = 115; // vertical field of view of each eye in stereo, degrees (115° found comfortable with Cardboard)
+  const STEREO_TUNING = false; // true = show the focus / FOV sliders at the top of the screen in stereo mode
+  const LENS_CA = 0; // colour fringe correction for cheap lenses (0 = off; was .012)
   const VR_PX_MM = 6; // CSS pixels per millimetre of a typical phone screen (Samsung A55 ≈ 5.9); used to place each eye's picture under its lens
   const VR_LENS_MM = { default: 64, '56': 56, '58': 58, '60': 60, '62': 62, '64': 64, '66': 66, '68': 68, '70': 70 }; // distance between the centres of the VR lenses, mm
   const SET = {
@@ -479,6 +568,11 @@
   let settingsOpen = false;
   let stereo = false;
   let lens = false;
+  let vrFov = null; // stereo field of view from the FOV slider, degrees (null = automatic)
+  if (STEREO_TUNING) try {
+    const f = localStorage.getItem('autumnTrain.fov');
+    if (f !== null && +f) vrFov = +f;
+  } catch (e) {}
   let lensRT = null;
   let menuClickT = null;
   let paused = false;
@@ -493,19 +587,23 @@
   const scene = new THREE.Scene();
   const camera = new THREE.PerspectiveCamera(52, 16 / 9, .1, 800);
   const SNAP = new THREE.Vector2(160, 90);
+  const QUANT = {
+    value: 44
+  }; // colour levels per channel for the dithered PS1 palette
   /**
    * F002 — Підлаштовує роздільність рендера, поле зору та стереобуфери під розмір вікна.
    */
   function resize() {
     const a = innerWidth / Math.max(1, innerHeight);
-    const rh = stereo ? a < 1 ? 800 : 600 : a < 1 ? 400 : 300; // render height: sharper in stereo (each eye gets only half the width), chunky PS1 pixels otherwise
+    const rh = stereo ? Math.round(innerHeight * Math.min(2, devicePixelRatio || 1)) : a < 1 ? 400 : 300; // render height: screen resolution in stereo (no pixelation), chunky PS1 pixels otherwise
     renderer.setSize(Math.round(rh * a), rh, false);
     const ea = stereo ? a / 2 : a;
     camera.aspect = ea;
-    camera.fov = stereo ? lens ? LENS_FOV : ea < 1 ? 80 : 66 : a < 1 ? 80 : 58;
+    camera.fov = stereo ? vrFov || LENS_FOV : a < 1 ? 80 : 58;
     camera.updateProjectionMatrix();
     if (lensRT) for (const t of lensRT) t.setSize(Math.max(1, Math.round(rh * a) >> 1), rh);
-    SNAP.set(Math.round(rh * a) / (stereo ? 2.4 : 1.2), rh / 1.2);
+    if (stereo) SNAP.set(1e5, 1e5);else SNAP.set(Math.round(rh * a) / 1.2, rh / 1.2); // stereo: no vertex snapping
+    QUANT.value = stereo ? 1024 : 44; // stereo: no visible colour banding
   }
   addEventListener('resize', resize);
   resize();
@@ -525,8 +623,9 @@
       s.uniforms.uSnap = {
         value: SNAP
       };
+      s.uniforms.uQuant = QUANT;
       s.vertexShader = s.vertexShader.replace('#include <common>', '#include <common>\nuniform vec2 uSnap;\nvarying vec3 vAff;').replace('#include <project_vertex>', '#include <project_vertex>\ngl_Position.xy=floor(gl_Position.xy/gl_Position.w*uSnap+0.5)/uSnap*gl_Position.w;\n#ifdef USE_UV\nvAff=vec3(vUv*gl_Position.w,gl_Position.w);\n#else\nvAff=vec3(0.0,0.0,1.0);\n#endif');
-      s.fragmentShader = s.fragmentShader.replace('#include <common>', '#include <common>\nvarying vec3 vAff;').replace('#include <map_fragment>', '#ifdef USE_MAP\nvec4 texelColor=texture2D(map,vAff.xy/vAff.z);\ntexelColor=mapTexelToLinear(texelColor);\ndiffuseColor*=texelColor;\n#endif').replace('#include <dithering_fragment>', '{const float BY[16]=float[16](0.,8.,2.,10.,12.,4.,14.,6.,3.,11.,1.,9.,15.,7.,13.,5.);ivec2 q=ivec2(mod(gl_FragCoord.xy,4.0));gl_FragColor.rgb=floor(gl_FragColor.rgb*44.0+BY[q.x+q.y*4]/16.0)/44.0;}');
+      s.fragmentShader = s.fragmentShader.replace('#include <common>', '#include <common>\nuniform float uQuant;\nvarying vec3 vAff;').replace('#include <map_fragment>', '#ifdef USE_MAP\nvec4 texelColor=texture2D(map,vAff.xy/vAff.z);\ntexelColor=mapTexelToLinear(texelColor);\ndiffuseColor*=texelColor;\n#endif').replace('#include <dithering_fragment>', '{const float BY[16]=float[16](0.,8.,2.,10.,12.,4.,14.,6.,3.,11.,1.,9.,15.,7.,13.,5.);ivec2 q=ivec2(mod(gl_FragCoord.xy,4.0));gl_FragColor.rgb=floor(gl_FragColor.rgb*uQuant+BY[q.x+q.y*4]/16.0)/uQuant;}');
     };
     return m;
   }
@@ -541,7 +640,8 @@
      * Параметри: s.
      */
     s => {
-      s.fragmentShader = s.fragmentShader.replace('#include <dithering_fragment>', '{const float BY[16]=float[16](0.,8.,2.,10.,12.,4.,14.,6.,3.,11.,1.,9.,15.,7.,13.,5.);ivec2 q=ivec2(mod(gl_FragCoord.xy,4.0));gl_FragColor.rgb=floor(gl_FragColor.rgb*44.0+BY[q.x+q.y*4]/16.0)/44.0;}');
+      s.uniforms.uQuant = QUANT;
+      s.fragmentShader = s.fragmentShader.replace('#include <common>', '#include <common>\nuniform float uQuant;').replace('#include <dithering_fragment>', '{const float BY[16]=float[16](0.,8.,2.,10.,12.,4.,14.,6.,3.,11.,1.,9.,15.,7.,13.,5.);ivec2 q=ivec2(mod(gl_FragCoord.xy,4.0));gl_FragColor.rgb=floor(gl_FragColor.rgb*uQuant+BY[q.x+q.y*4]/16.0)/uQuant;}');
     };
     m.customProgramCacheKey =
     /**
@@ -10640,8 +10740,8 @@
      */
     () => {
       const t = new THREE.WebGLRenderTarget(w, h, {
-        minFilter: THREE.NearestFilter,
-        magFilter: THREE.NearestFilter
+        minFilter: THREE.LinearFilter,
+        magFilter: THREE.LinearFilter
       });
       return t;
     });
@@ -10696,7 +10796,19 @@
    * щоб її середина опинилась точно під лінзою VR-окулярів. Без цього далекі предмети двояться: центри половинок
    * широкого екрана стоять далі один від одного, ніж лінзи, і очам доводиться розходитись.
    */
+  const VR_FOCUS0 = 6.5; // default focus slider position (found comfortable on Samsung A55 + Cardboard)
+  let vrFocus = VR_FOCUS0; // user focus offset from the slider, in % of one eye's width
+  if (STEREO_TUNING) try {
+    const f = localStorage.getItem('autumnTrain.focus');
+    vrFocus = f === null ? VR_FOCUS0 : +f || 0;
+  } catch (e) {}
   function vrShift() {
+    return Math.max(-.45, Math.min(.45, vrBase() + vrFocus / 100));
+  }
+  /**
+   * F440c — Базовий зсув картинок під лінзи (без урахування слайдера фокусу).
+   */
+  function vrBase() {
     // only a phone in a headset needs this: on a computer screen (mouse, big monitor) the halves stay centred as in a regular side-by-side video
     if (SET.vr === 'off' || !matchMedia('(pointer: coarse)').matches || Math.min(screen.width, screen.height) > 600) return 0;
     const half = innerWidth / 2;
@@ -10793,7 +10905,10 @@
     lens = on;
     document.body.classList.toggle('lens', on);
     mLens.setAttribute('aria-pressed', on ? 'true' : 'false');
-    if (on && !stereo) setStereo(true);else resize();
+    if (on && !stereo) setStereo(true);else if (!on && stereo) setStereo(false);else {
+      resize();
+      showFov();
+    }
     try {
       localStorage.setItem('autumnTrain.lens', on ? '1' : '0');
     } catch (e) {}
@@ -10815,10 +10930,64 @@
     document.body.classList.toggle('stereo', on);
     mStereo.setAttribute('aria-pressed', on ? 'true' : 'false');
     resize();
+    showFov();
     try {
       localStorage.setItem('autumnTrain.stereo', on ? '1' : '0');
     } catch (e) {}
   }
+  const focusEl = document.getElementById('focus');
+  const focusR = document.getElementById('focusR');
+  const focusV = document.getElementById('focusV');
+  let focusIdleT = null;
+  focusR.value = vrFocus;
+  /**
+   * F444a — Застосовує положення слайдера фокусу стерео, запам'ятовує його і ненадовго робить слайдер яскравим.
+   */
+  function setFocus(v) {
+    vrFocus = Math.max(-30, Math.min(30, +v || 0));
+    focusR.value = vrFocus;
+    focusV.textContent = (vrFocus > 0 ? '+' : vrFocus < 0 ? '−' : '') + Math.abs(vrFocus).toFixed(1).replace(/\.0$/, '');
+    if (STEREO_TUNING) try {
+      localStorage.setItem('autumnTrain.focus', String(vrFocus));
+    } catch (e) {}
+    focusEl.classList.remove('idle');
+    clearTimeout(focusIdleT);
+    focusIdleT = setTimeout(() => focusEl.classList.add('idle'), 3000);
+  }
+  const fovR = document.getElementById('fovR');
+  const fovV = document.getElementById('fovV');
+  /**
+   * F444b — Задає кут огляду обох камер у стерео (null — автоматичний), показує його і запам'ятовує.
+   */
+  function setFov(v) {
+    vrFov = v === null ? null : Math.max(40, Math.min(120, +v || 66));
+    if (STEREO_TUNING) try {
+      if (vrFov === null) localStorage.removeItem('autumnTrain.fov');else localStorage.setItem('autumnTrain.fov', String(vrFov));
+    } catch (e) {}
+    resize();
+    showFov();
+    focusEl.classList.remove('idle');
+    clearTimeout(focusIdleT);
+    focusIdleT = setTimeout(() => focusEl.classList.add('idle'), 3000);
+  }
+  /**
+   * F444c — Показує на слайдері кут огляду, який зараз діє.
+   */
+  function showFov() {
+    const f = Math.round(camera.fov);
+    fovR.value = f;
+    fovV.textContent = f + '°';
+  }
+  focusR.addEventListener('input', () => setFocus(focusR.value));
+  fovR.addEventListener('input', () => setFov(fovR.value));
+  document.getElementById('focus0').addEventListener('click', e => {
+    e.stopPropagation();
+    setFocus(VR_FOCUS0);
+    setFov(null);
+  });
+  for (const ev of ['pointerdown', 'click', 'dblclick', 'touchend']) focusEl.addEventListener(ev, e => e.stopPropagation());
+  document.body.classList.toggle('tuning', STEREO_TUNING);
+  setFocus(vrFocus);
   /**
    * F445 — Показує або ховає бічне меню та перезапускає таймер автоматичного приховування.
    * Параметри: on.
@@ -11037,7 +11206,6 @@
   });
   if (MENU_ENABLED) {
     try {
-      if (localStorage.getItem('autumnTrain.stereo') === '1') setStereo(true);
       if (localStorage.getItem('autumnTrain.lens') === '1') setLens(true);
       if (localStorage.getItem('autumnTrain.map') === '1') setMap(true);
       if (localStorage.getItem('autumnTrain.mapSmall') === '1') setCompact(true);
@@ -12896,6 +13064,8 @@
     p: -.08
   };
   let SEAT = SEAT1;
+  const STEREO_YAW = 2 * Math.PI / 180; // in stereo the head turns 2° right on the first seat and 2° left on the opposite one
+  let seatYaw = 0; // current eased extra head turn
   const STAND = {
     x: -.62,
     y: 1.68,
@@ -12987,7 +13157,7 @@
      * Параметри: e.
      */
     e => {
-      if (e.target.closest && e.target.closest('#menu,#route,#settings')) return;
+      if (e.target.closest && e.target.closest('#menu,#route,#settings,#focus')) return;
       e.preventDefault();
       clearTimeout(menuClickT);
       menuClickT = null;
@@ -13000,7 +13170,7 @@
      */
     e => {
       const t = e.changedTouches[0];
-      if (!t || e.target.closest && e.target.closest('#menu,#route,#settings')) return;
+      if (!t || e.target.closest && e.target.closest('#menu,#route,#settings,#focus')) return;
       const n = performance.now();
       if (n - tT < 350 && Math.hypot(t.clientX - tx, t.clientY - ty) < 40) {
         tT = 0;
@@ -14039,7 +14209,8 @@
     let moving = false;
     if (tr) tr(dt);else if (viewMode === 'seat') {
       const dw = Math.min(1, speed / 6);
-      pose.a = SEAT.a + ox * .045 * dw;
+      seatYaw += ((stereo ? SEAT === SEAT1 ? STEREO_YAW : -STEREO_YAW : 0) - seatYaw) * Math.min(1, dt * 3);
+      pose.a = SEAT.a + seatYaw + ox * .045 * dw;
       pose.p = SEAT.p + Math.sin(T * .05) * .006 * dw;
     } else if (viewMode === 'walk') moving = walk(dt);
     const bob = moving ? Math.sin(T * 9) * .012 : 0;
@@ -14075,3 +14246,4 @@
 </script>
   </body>
 </html>
+</body></html>
