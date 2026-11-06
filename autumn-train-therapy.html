@@ -609,24 +609,13 @@
 
   /* ---------- PS1 look: snapped vertices, affine textures, dithered colour ---------- */
   /**
-   * F003 — Додає матеріалу ретро-ефекти: прив’язку вершин до сітки, афінні текстури та дизеринг.
+   * F003 — Колись додавав прив’язку вершин до сітки й афінні текстури; тепер лише дизеринг (див. psxSoft).
    * Параметри: m.
    */
   function psx(m) {
-    m.onBeforeCompile =
-    /**
-     * F004 — Перед компіляцією змінює вершинний і фрагментний шейдери матеріалу для ретро-ефектів.
-     * Параметри: s.
-     */
-    s => {
-      s.uniforms.uSnap = {
-        value: SNAP
-      };
-      s.uniforms.uQuant = QUANT;
-      s.vertexShader = s.vertexShader.replace('#include <common>', '#include <common>\nuniform vec2 uSnap;\nvarying vec3 vAff;').replace('#include <project_vertex>', '#include <project_vertex>\ngl_Position.xy=floor(gl_Position.xy/gl_Position.w*uSnap+0.5)/uSnap*gl_Position.w;\n#ifdef USE_UV\nvAff=vec3(vUv*gl_Position.w,gl_Position.w);\n#else\nvAff=vec3(0.0,0.0,1.0);\n#endif');
-      s.fragmentShader = s.fragmentShader.replace('#include <common>', '#include <common>\nuniform float uQuant;\nvarying vec3 vAff;').replace('#include <map_fragment>', '#ifdef USE_MAP\nvec4 texelColor=texture2D(map,vAff.xy/vAff.z);\ntexelColor=mapTexelToLinear(texelColor);\ndiffuseColor*=texelColor;\n#endif').replace('#include <dithering_fragment>', '{const float BY[16]=float[16](0.,8.,2.,10.,12.,4.,14.,6.,3.,11.,1.,9.,15.,7.,13.,5.);ivec2 q=ivec2(mod(gl_FragCoord.xy,4.0));gl_FragColor.rgb=floor(gl_FragColor.rgb*uQuant+BY[q.x+q.y*4]/16.0)/uQuant;}');
-    };
-    return m;
+    // the PS1 look (vertices snapped to a coarse grid, affine "swimming" textures) is switched off everywhere;
+    // only the soft dithered colour stays, as on the industrial textures
+    return psxSoft(m);
   }
   /**
    * F005 — Додає матеріалу лише дизеринг, залишаючи геометрію без прив’язки до сітки.
@@ -1609,6 +1598,10 @@
   scene.add(outside);
   const CL = 40;
   const world = new THREE.Group();
+  // a single light for the lamp of the nearest level crossing at night (always in the scene, so shaders never recompile)
+  const XLIGHT = new THREE.PointLight(0xffc880, 0, 18, 1.5);
+  const XANCH = [];
+  const XV = new THREE.Vector3();
   outside.add(world);
   const chunks = [];
   const GROUNDV = GL({
@@ -1740,6 +1733,11 @@
     blending: THREE.AdditiveBlending,
     depthWrite: false
   });
+  Object.assign(POOL, {
+    polygonOffset: true,
+    polygonOffsetFactor: -6,
+    polygonOffsetUnits: -6
+  }); // the glow on the ground stays on top of roads and decks
   const POOL_GEO = new THREE.CircleGeometry(3.2, 10).rotateX(-Math.PI / 2);
   /* ---------- stations ---------- */
   const STN_ADJ = ['Тихі', 'Старі', 'Нові', 'Дальні', 'Теплі', 'Малі', 'Вишневі', 'Кленові', 'Сірі', 'Нижні', 'Верхні', 'Білі'];
@@ -3748,7 +3746,7 @@
         for (let x = 6; x < 34; x += 1.2) if (chance(.5)) addBox(g, MAT.reed, x + rr(-.4, .4), PT, rr(-9.6, -10.4), .05, rr(.2, .5), .05);
       }
       if (wood) {
-        dacha(g, 26, -14.5);
+        dacha(g, 26, g.userData.biome === 'village' ? -22 : -14.5);
         addBox(g, MAT.bark, 9, 0, -10.2, .18, 6, .18);
         addBox(g, MAT.lamp, 9, 5.8, -9.6, .4, .12, .25);
         splitPool(g, 9, -8.6, 4.2, PT, -6.3);
@@ -4826,12 +4824,25 @@
     });
     return q;
   }
+  // road layers that lie flat on each other are pulled towards the camera by different amounts, so they never flicker:
+  // ground / village road < country road ribbon < asphalt and crossing deck < road markings
+  const PO = n => ({
+    polygonOffset: true,
+    polygonOffsetFactor: -n,
+    polygonOffsetUnits: -n
+  });
   const ROADM = L({
     map: tGround,
-    color: 0x3a3a3c
+    color: 0x3a3a3c,
+    ...PO(2)
   });
   const DECKM = L({
-    color: 0x2e2c2a
+    color: 0x2e2c2a,
+    ...PO(2)
+  });
+  const ROADMK = L({
+    color: DM.white.color.getHex(),
+    ...PO(4)
   });
   const CARC = [0x6a2a24, 0xc8c4b8, 0x2a3a5a, 0x3a4a2a, 0x8a7a3a, 0x1e1e20, 0x5a5a5e].map(
   /**
@@ -4861,6 +4872,7 @@
       ax: g.userData.ax + lx,
       ang
     });
+    if (g.userData.vroad && g.userData.vroad.parent) crossVillage(g, lx, ang);
     const r = new THREE.Group();
     r.position.set(lx, 0, -3.6);
     r.rotation.y = ang;
@@ -4904,7 +4916,7 @@
     rp.rotation.x = -Math.atan2(.82, 5.6);
     r.add(rp);
     addBox(r, ROADM, 0, 0, -135.5, 7, .05, 249);
-    for (let z = -14; z > -250; z -= 6) addBox(r, DM.white, 0, .051, z, .15, .005, 2.6);
+    for (let z = -14; z > -250; z -= 6) addBox(r, ROADMK, 0, .051, z, .15, .005, 2.6);
     addBox(r, MAT.metal, -4.2, 0, -10, .22, 1.1, .22);
     const arm = new THREE.Mesh(GEO.cbox, MAT.stripe);
     arm.scale.set(4.4, .12, .12);
@@ -4936,6 +4948,16 @@
     const pl = new THREE.Mesh(POOL_GEO, POOL);
     pl.position.set(1.2, .1, -9.8);
     r.add(pl);
+    {
+      // where the crossing lamp shines from: at night one real light is moved here, so cars waiting below catch it
+      const la = dyn(new THREE.Object3D());
+      la.position.set(2, 5.6, -9.6);
+      r.add(la);
+      XANCH.push({
+        a: la,
+        g
+      });
+    }
     const n = rnd() * 6 | 0;
     let z = -12.4;
     for (let i = 0; i < n; i++) {
@@ -5482,16 +5504,25 @@
     color: c,
     side: THREE.DoubleSide
   }));
+  // windows, shutters and trims lie flat on walls: pulled towards the camera so they never flicker through them
+  const PO2 = n => ({
+    polygonOffset: true,
+    polygonOffsetFactor: -n,
+    polygonOffsetUnits: -n
+  });
   const SHUT = L({
-    color: 0x3a5a8a
+    color: 0x3a5a8a,
+    ...PO2(2)
   });
   const WINV = L({
     color: 0x262a30,
     emissive: 0xe0b060,
-    emissiveIntensity: .04
+    emissiveIntensity: .04,
+    ...PO2(3)
   });
   const WINVD = L({
-    color: 0x24282c
+    color: 0x24282c,
+    ...PO2(3)
   });
   const HALLWIND = L({
     color: 0x3a3c3a
@@ -5503,6 +5534,11 @@
     map: tGround,
     color: 0x6a5a42
   });
+  const DIRTR = L({
+    map: tGround,
+    color: 0x6a5a42,
+    ...PO(1)
+  }); // the curved country roads lying on top of the village road
   const PLOT = L({
     map: ctex(16, 16,
     /**
@@ -5654,7 +5690,8 @@
   }
   const YAX = new THREE.Vector3(0, 1, 0);
   const TRIM = L({
-    color: 0xd8d4c8
+    color: 0xd8d4c8,
+    ...PO2(1)
   });
   const LOGW = L({
     map: tWood,
@@ -5707,7 +5744,7 @@
     }
     for (const k of [-1, 1]) {
       const wx = x + k * w * .27;
-      addBox(g, lw(), wx, 1.0, z + d / 2 + .01, .85, .95, .05);
+      addBox(g, lw(), wx, 1.0, z + d / 2 + .035, .85, .95, .05);
       if (trim) {
         addBox(g, TRIM, wx, .92, z + d / 2 + .015, 1.05, 1.12, .03);
         addBox(g, TRIM, wx, 2.05, z + d / 2 + .03, 1.2, .12, .05);
@@ -5812,67 +5849,200 @@
     addBox(g, MAT.bark, x, 6.4, z, .1, .1, 1.6).userData.keep = 1;
   }
   /**
-   * F227 — Створює відгалуження сільської дороги й реєструє смугу, вільну від перешкод.
+   * F226a — Стрічка ґрунтової дороги шириною 3.4 м уздовж точок pts ([x, z, напрямок, пройдена відстань]);
+   * освітлення й масштаб текстури такі самі, як у сільської дороги вздовж колії.
+   * Параметри: grp; pts.
+   */
+  function dirtRibbon(grp, pts) {
+    // ribbon of dirt, as wide as the village road, a hair above it where they overlap; same texture scale and lighting
+    const W = 1.7;
+    const v = [];
+    const nrm = [];
+    const uv = [];
+    const tri = (a, b, c, ua, ub, uc) => {
+      const cr = (b[2] - a[2]) * (c[0] - a[0]) - (b[0] - a[0]) * (c[2] - a[2]); // y of (b-a)x(c-a)
+      if (cr < 0) {
+        [b, c] = [c, b];
+        [ub, uc] = [uc, ub];
+      }
+      v.push(...a, ...b, ...c);
+      nrm.push(0, 1, 0, 0, 1, 0, 0, 1, 0);
+      uv.push(...ua, ...ub, ...uc);
+    };
+    for (let i = 1; i < pts.length; i++) {
+      const [ax, az, ha, sa] = pts[i - 1];
+      const [bx, bz, hb, sb] = pts[i];
+      const y = .045;
+      const A1 = [ax - Math.sin(ha) * W, y, az - Math.cos(ha) * W];
+      const A2 = [ax + Math.sin(ha) * W, y, az + Math.cos(ha) * W];
+      const B1 = [bx - Math.sin(hb) * W, y, bz - Math.cos(hb) * W];
+      const B2 = [bx + Math.sin(hb) * W, y, bz + Math.cos(hb) * W];
+      const ua = sa / CL;
+      const ub = sb / CL;
+      tri(A1, B1, B2, [ua, 0], [ub, 0], [ub, 1]);
+      tri(A1, B2, A2, [ua, 0], [ub, 1], [ua, 1]);
+    }
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.Float32BufferAttribute(v, 3));
+    geo.setAttribute('normal', new THREE.Float32BufferAttribute(nrm, 3));
+    geo.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
+    const m = new THREE.Mesh(geo, DIRTR);
+    grp.add(m);
+    return m;
+  }
+  /**
+   * F226b — Точки плавної дороги від S (напрямок dS) до E (напрямок dE) кубічною кривою Безьє; формат як у dirtRibbon.
+   * Параметри: S; dS; E; dE; k, k2 — довжина «вусів» кривої на початку й у кінці.
+   */
+  function bezRoad(S, dS, E, dE, k, k2 = k) {
+    const C1 = [S[0] + dS[0] * k, S[1] + dS[1] * k];
+    const C2 = [E[0] - dE[0] * k2, E[1] - dE[1] * k2];
+    const P = t => {
+      const u = 1 - t;
+      return [u * u * u * S[0] + 3 * u * u * t * C1[0] + 3 * u * t * t * C2[0] + t * t * t * E[0], u * u * u * S[1] + 3 * u * u * t * C1[1] + 3 * u * t * t * C2[1] + t * t * t * E[1]];
+    };
+    const pts = [];
+    let sAcc = 0;
+    let prev = null;
+    const n = 40;
+    for (let i = 0; i <= n; i++) {
+      const q = P(i / n);
+      const a = P(Math.max(0, i / n - .01));
+      const b = P(Math.min(1, i / n + .01));
+      const h = Math.atan2(-(b[1] - a[1]), b[0] - a[0]);
+      if (prev) sAcc += Math.hypot(q[0] - prev[0], q[1] - prev[1]);
+      pts.push([q[0], q[1], h, sAcc]);
+      prev = q;
+    }
+    return pts;
+  }
+  /**
+   * F227b — Сільська дорога вздовж колії на відрізку, де її звичайне місце зайняте (станція, колія острівної зупинки):
+   * гладка стрічка по лінії zf(x), з'єднана з дорогою сусідніх відрізків на краях; дерева її обходять.
+   * Параметри: g; zf; poles — чи ставити стовпи вздовж неї.
+   */
+  function villageRoadAlong(g, zf, poles) {
+    const rg = new THREE.Group();
+    rg.userData.keep = 1;
+    g.add(rg);
+    const pts = [];
+    let sAcc = 0;
+    for (let x = 0; x <= CL + .01; x += 2) {
+      const z = zf(x);
+      const h = Math.atan2(-(zf(x + .5) - zf(x - .5)), 1);
+      if (pts.length) sAcc += Math.hypot(2, z - pts[pts.length - 1][1]);
+      pts.push([x, z, h, sAcc]);
+    }
+    dirtRibbon(rg, pts);
+    roads.push({
+      ax: g.userData.ax,
+      ang: 0,
+      w: 9,
+      pts: pts.map(p => [g.userData.ax + p[0], p[1]])
+    });
+    const W = g.userData.wtClear || (g.userData.wtClear = []);
+    for (const p of pts) W.push([p[0], p[1], 3.2]);
+    if (poles) {
+      vpole(rg, 2, zf(2) - 2);
+      vpole(rg, 22, zf(22) - 2);
+      let pa = null;
+      for (let x = 2; x <= 42; x += 4) {
+        const pb = new THREE.Vector3(x, 6.45, zf(Math.min(x, CL)) - 2);
+        if (pa) wireSeg(rg, pa, pb);
+        pa = pb;
+      }
+    }
+  }
+  /**
+   * F227c — Станція посеред села: сільська дорога не обривається, а плавно обходить платформу (або колію острівної зупинки) ззаду.
    * Параметри: g.
    */
-  function feeder(g, x0 = 2) {
-    // a smooth country road: leaves the road along the track tangentially, bends away from the railway and then wanders a little
+  function stationVillageRoad(g) {
+    if (g.userData.tz) {
+      const tz = g.userData.tz;
+      villageRoadAlong(g, x => Math.min(-10.6, tz(Math.max(0, Math.min(CL, x))) - 4.3), false);
+      return;
+    }
+    const k = x => {
+      const t = Math.max(0, Math.min(1, x));
+      return t * t * (3 - 2 * t);
+    };
+    villageRoadAlong(g, x => -10.6 - 3.8 * Math.min(k(x / 10), k((CL - x) / 10)), false);
+  }
+  /**
+   * F227a — Переїзд у селі: сільська дорога вздовж колії не обривається, а з обох боків плавно вливається в дорогу переїзду
+   * за підніжжям насипу.
+   * Параметри: g; lx — де дорога переїзду перетинає колію; ang — її кут.
+   */
+  function crossVillage(g, lx, ang) {
+    const u = [-Math.sin(ang), -Math.cos(ang)]; // away from the railway along the crossing road
+    const x0 = g.userData.vroadX || 0;
+    const xc = lx + u[0] * (7 / -u[1]); // where the crossing road passes the line of the village road
+    const D = rr(26, 32); // join the crossing road well beyond the foot of its ramp
+    const n = [-u[1], u[0]]; // across the crossing road, towards +x
+    const E = s => [lx + u[0] * D + n[0] * s * 1.9, -3.6 + u[1] * D + n[1] * s * 1.9]; // along its edge, on side s
+    const xs = Math.max(x0, xc - rr(20, 26));
+    const xf = Math.min(CL, xc + rr(20, 26));
+    const rg = g.userData.vroad.parent;
+    rg.remove(g.userData.vroad);
+    if (xs - x0 > .3) addBox(rg, DIRT, (x0 + xs) / 2, .0, -10.6, xs - x0, .04, 3.4);
+    if (CL - xf > .3) addBox(rg, DIRT, (xf + CL) / 2, .0, -10.6, CL - xf, .04, 3.4);
+    for (const [S, dS, sd] of [[[xs, -10.6], [1, 0], -1], [[xf, -10.6], [-1, 0], 1]]) {
+      const Ed = E(sd);
+      const dd = Math.hypot(Ed[0] - S[0], Ed[1] - S[1]);
+      const pts = bezRoad(S, dS, Ed, u, dd * .55, dd * .3);
+      dirtRibbon(rg, pts);
+      roads.push({
+        ax: g.userData.ax + S[0],
+        ang: 0,
+        w: 9,
+        pts: pts.map(p => [g.userData.ax + p[0], p[1]])
+      });
+    }
+    g.userData.vroad = null;
+  }
+  /**
+   * F227 — Створює відгалуження сільської дороги й реєструє смугу, вільну від перешкод.
+   * Параметри: g; x0 — де дорога торкається дороги вздовж колії; mode — 'start' чи 'end' села.
+   */
+  function feeder(g, x0 = 2, mode = 'end') {
+    // a smooth country road joined tangentially to the road along the track:
+    // 'end'   — the village road carries on past the last house and bends away from the railway;
+    // 'start' — the road comes in from the fields and sweeps into the start of the village road (which begins right here)
     const grp = new THREE.Group();
     grp.userData.keep = 1;
     g.add(grp);
-    const h0 = rr(1, 1.35); // final heading away from the track, rad from the track direction
-    const bend = rr(14, 22); // length of the turn out of the main road
-    const amp = rr(.12, .3);
+    const st = mode === 'start';
+    const th0 = st ? Math.PI : 0; // direction at the junction (along the track, away from the village road)
+    const th1 = st ? Math.PI / 2 - rr(.1, .35) : rr(1, 1.35); // direction it settles to, away from the railway
+    const bend = rr(28, 38); // a long, gentle turn out of the main road
+    const amp = rr(.08, st ? .14 : .26);
     const wl = rr(40, 70);
     const ph = rr(0, 6.3);
     const pts = [];
     let x = x0;
     let z = -10.6;
-    for (let s = 0; s <= 160; s += 2) {
+    for (let s = 0; s <= 170; s += 2) {
       const k = Math.min(1, s / bend);
-      const h = h0 * k * k * (3 - 2 * k) + (s > bend ? amp * Math.sin((s - bend) / wl * 6.283 + ph) * Math.min(1, (s - bend) / 20) : 0);
-      pts.push([x, z, h]);
+      const h = th0 + (th1 - th0) * k * k * (3 - 2 * k) + (s > bend ? amp * Math.sin((s - bend) / wl * 6.283 + ph) * Math.min(1, (s - bend) / 20) : 0);
+      pts.push([x, z, h, s]);
       x += Math.cos(h) * 2;
       z -= Math.sin(h) * 2;
     }
-    // ribbon of dirt, 3.4 m wide, a hair above the main road where they overlap
-    const W = 1.7;
-    const v = [];
-    const uv = [];
-    for (let i = 1; i < pts.length; i++) {
-      const [ax, az, ha] = pts[i - 1];
-      const [bx, bz, hb] = pts[i];
-      const na = [Math.sin(ha) * W, Math.cos(ha) * W];
-      const nb = [Math.sin(hb) * W, Math.cos(hb) * W];
-      const y = .045;
-      const A1 = [ax - na[0], y, az - na[1]];
-      const A2 = [ax + na[0], y, az + na[1]];
-      const B1 = [bx - nb[0], y, bz - nb[1]];
-      const B2 = [bx + nb[0], y, bz + nb[1]];
-      v.push(...A1, ...B1, ...B2, ...A1, ...B2, ...A2);
-      const u0 = (i - 1) * .5;
-      const u1 = i * .5;
-      uv.push(u0, 0, u1, 0, u1, .85, u0, 0, u1, .85, u0, .85);
-    }
-    const geo = new THREE.BufferGeometry();
-    geo.setAttribute('position', new THREE.Float32BufferAttribute(v, 3));
-    geo.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
-    geo.computeVertexNormals();
-    const rd = new THREE.Mesh(geo, DIRT);
-    rd.material.side = THREE.DoubleSide;
-    grp.add(rd);
+    dirtRibbon(grp, pts);
     roads.push({
       ax: g.userData.ax + x0,
       ang: 0,
       w: 10,
       pts: pts.map(p => [g.userData.ax + p[0], p[1]])
     });
-    // a pole line along the road, on its far side
+    // a pole line along the road, on its far side, starting once the road has left the railway
     let pa = null;
-    for (let i = 0; i < pts.length; i += 11) {
+    for (let i = Math.ceil(bend / 2); i < pts.length; i += 11) {
       const [px, pz, h] = pts[i];
-      const qx = px + Math.sin(h) * -2.4;
-      const qz = pz + Math.cos(h) * -2.4;
+      const side = st ? 1 : -1;
+      const qx = px + Math.sin(h) * side * 2.4;
+      const qz = pz + Math.cos(h) * side * 2.4;
       vpole(grp, qx, qz);
       const pb = new THREE.Vector3(qx, 6.45, qz);
       if (pa) wireSeg(grp, pa, pb);
@@ -5988,11 +6158,22 @@
     const rg = new THREE.Group();
     rg.userData.keep = 1;
     g.add(rg);
-    addBox(rg, DIRT, first ? 21 : CL / 2, .0, -10.6, first ? 38 : CL, .04, 3.4);
-    vpole(rg, 2, -12.6);
-    vpole(rg, 22, -12.6);
-    for (const dz of [-.6, .6]) addBox(rg, MAT.dark, CL / 2 + 2, 6.45, -12.6 + dz * .6, CL, .025, .025);
-    if (first && !roadNear(g.userData.ax, 25)) feeder(g);
+    // at the start of the village the road along the track begins where the country road sweeps into it (no stub before it)
+    const fd = first && !roadNear(g.userData.ax, 25);
+    const J = fd ? rr(26, 32) : first ? 2 : 0;
+    if (g.userData.tz) {
+      // the oncoming track swings out here for an island stop: the village road keeps clear of it
+      const tz = g.userData.tz;
+      villageRoadAlong(g, x => Math.min(-10.6, tz(Math.max(0, Math.min(CL, x))) - 4.3), true);
+    } else {
+      g.userData.vroad = addBox(rg, DIRT, (J + CL) / 2, .0, -10.6, CL - J, .04, 3.4);
+      g.userData.vroadX = J;
+      const p0 = Math.max(2, J);
+      vpole(rg, p0, -12.6);
+      if (p0 < 20) vpole(rg, 22, -12.6);
+      for (const dz of [-.6, .6]) addBox(rg, MAT.dark, (p0 + CL + 2) / 2, 6.45, -12.6 + dz * .6, CL + 2 - p0, .025, .025);
+    }
+    if (fd) feeder(g, J, 'start');
     const wtSx = g.userData.wt ? pick([0, 20]) : -1;
     for (const [za, zb, pr] of [[-21, -24, .6], [-46, -66, .5], [-92, -128, .4]]) for (let sx = 0; sx < CL; sx += 20) {
       if (first && sx === 0 && za === -21) continue;
@@ -7889,7 +8070,7 @@
     g.userData.keep = 1;
     g0.add(g);
     addBox(g, ROADM, CL / 2, 0, -27.7, CL, .05, 7.4);
-    for (let x = 1; x < CL; x += 6) addBox(g, DM.white, x, .051, -27.7, 2.6, .005, .14);
+    for (let x = 1; x < CL; x += 6) addBox(g, ROADMK, x, .051, -27.7, 2.6, .005, .14);
     if (!plain) for (const z of [-25.6, -26.8, -28.6, -29.8]) addBox(g, MAT.rail, CL / 2, .05, z, CL, .03, .06);
     if (plain) return;
     addBox(g, MAT.metal, 20, 0, -32, .2, 7, .2);
@@ -7975,7 +8156,7 @@
     if (!plain) turnWires(rg, lx, side);
     if (side === 'start') fillet(rg, lx + 3.7, -31.4, 1, 5);else fillet(rg, lx - 3.7, -31.4, -1, 5);
     addBox(rg, ROADM, lx, 0, -135.7, 7.4, .05, 208);
-    for (let z = -36; z > -238; z -= 6) addBox(rg, DM.white, lx, .051, z, .14, .005, 2.6);
+    for (let z = -36; z > -238; z -= 6) addBox(rg, ROADMK, lx, .051, z, .14, .005, 2.6);
     roads.push({
       ax: g.userData.ax + lx,
       ang: 0,
@@ -8535,8 +8716,8 @@
   function valleyRoad(g, G) {
     const Y = -9.08;
     addBox(G, ROADM, 20, Y, -262, 15, .12, 520);
-    for (let z = -8; z > -520; z -= 7) for (const x of [16.3, 23.7]) addBox(G, DM.white, x, Y + .125, z, .14, .005, 3);
-    for (const x of [12.65, 27.35]) addBox(G, DM.white, x, Y + .125, -262, .12, .005, 520);
+    for (let z = -8; z > -520; z -= 7) for (const x of [16.3, 23.7]) addBox(G, ROADMK, x, Y + .125, z, .14, .005, 3);
+    for (const x of [12.65, 27.35]) addBox(G, ROADMK, x, Y + .125, -262, .12, .005, 520);
     addBox(G, CONC, 20, Y + .12, -262, .5, .75, 520);
     for (const x of [12.2, 27.8]) {
       const p = [];
@@ -9538,6 +9719,7 @@
       shiftTrack(g, c, shIdx, st);
       if (shIdx === 4) stShift = false;
     }
+    if (st && biome === 'village') stationVillageRoad(g);
     if (!stationBuild && !stShift) stNamePlan = null;
     g.userData.wt = !st && !yardC && !g.userData.buf && wtPlan(g, biome);
     if (awayZone && g.userData.ax >= awayZone.ax1 - .1) awayZone = null;
@@ -9688,7 +9870,7 @@
       rg.userData.keep = 1;
       g.add(rg);
       addBox(rg, DIRT, 1, .0, -10.6, 2, .04, 3.4);
-      feeder(g, 0);
+      feeder(g, 0, 'end');
     }
     if (!g.userData.station && !g.userData.buf && !['city', 'pgt', 'village', 'lake'].includes(biome) && !g.userData.road && !g.userData.river && (pv && pv.userData.road || biome === 'cityforest') && chance(biome === 'cityforest' ? .12 : .5)) garageCoop(g, 12, 38);
     if (pv && pv.userData.road && !g.userData.road) {
@@ -14751,6 +14933,22 @@
     }
     night += (nightTarget - night) * dt * .04;
     const nf = night * night * (3 - 2 * night);
+    {
+      if (!XLIGHT.parent) scene.add(XLIGHT);
+      for (let i = XANCH.length - 1; i >= 0; i--) if (!chunks.includes(XANCH[i].g)) XANCH.splice(i, 1);
+      let best = null;
+      let bd = 1e9;
+      for (const o of XANCH) {
+        o.a.getWorldPosition(XV);
+        const d = Math.abs(XV.x - 10);
+        if (d < bd && XV.x > -80 && XV.x < 140) {
+          bd = d;
+          best = XV.clone();
+        }
+      }
+      if (best) XLIGHT.position.copy(best);else XLIGHT.position.set(0, -500, 0);
+      XLIGHT.intensity = best ? Math.max(0, nf - .45) * 2.6 : 0;
+    }
     {
       let tt = 0;
       for (const r of tunnels) tt = Math.max(tt, Math.min(1, (odo - r.a0) / 9, (r.a1 - odo) / 9));
