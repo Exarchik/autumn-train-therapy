@@ -531,7 +531,7 @@
 () => {
   /* ---------- switches ---------- */
   const MENU_ENABLED = true; // single click / tap opens the side menu (stereo mode etc.)
-  const TEST_TOOLS = true; // NumPad test keys: + station, − island, 4 island with train, 6 big bridge over the sea (random layout, top and bottom), 7 yard, 8 tunnel, 9 oncoming train
+  const TEST_TOOLS = true; // NumPad test keys: + station, − island, 4 island with train, 0 fog on/off, 5 hill, 6 big bridge over the sea (random layout, top and bottom), 7 yard, 8 tunnel, 9 oncoming train
   const STEREO_EYE = .064; // distance between the two stereo cameras, metres (average human eye distance)
   const STEREO_SIDE = 1; // where the second (right-half) camera sits: 1 = to the right (correct for VR glasses), -1 = to the left (cross-eyed viewing)
   const LENS_K1 = .22;
@@ -7640,6 +7640,136 @@
     PIPES.forEach((P, i) => pipeEnd(G, 'down', CL - .4 - i * .9, P, g.userData.pipeM[i]));
     pipeRun = null;
   }
+  // ---- low hills in the background of fields, groves and forests: rise and fall smoothly over several chunks;
+  // half of them wooded all over, the rest with a church or a water tower on top ----
+  const HILL_B = ['field', 'birch', 'forest'];
+  let hillZone = null;
+  let nextHillAbs = rr(200, 900); // the first hill may come soon after the start
+  let HILL_FORCE = null; // tests: 'forest' | 'church' | 'tower' puts a hill of that kind as soon as possible
+  let hillOnce = null; // test key NumPad 5: one hill of this kind as soon as the terrain allows
+  /**
+   * F239k — Висота пагорба H у точці (абсолютний x, z); 0 поза ним, трохи нижче нуля по краю, щоб не було шва з землею.
+   * Параметри: H; ax; z.
+   */
+  function hillH(H, ax, z) {
+    const u = (ax - H.cx) / H.a;
+    const v = (z - H.cz) / H.b;
+    const r = Math.sqrt(u * u + v * v) * (1 + .06 * Math.sin(Math.atan2(v, u) * 3 + H.ph));
+    if (r >= 1) return -.4;
+    const f = (Math.cos(Math.PI * r) + 1) / 2;
+    return H.h * f * f * (3 - 2 * f) - .4;
+  }
+  /**
+   * F239l — Чи можна починати пагорб із відрізка g: місцевість підходить і попереду за планом немає подій чи інших місцевостей.
+   * Параметри: g; n — скільки відрізків займе пагорб.
+   */
+  function hillOk(g, n) {
+    if (!HILL_B.includes(g.userData.biome) || g.userData.vpart || g.userData.river || g.userData.station || g.userData.buf || valley) return false;
+    if (planOff) return true;
+    const k0 = slotK(g.userData.ax);
+    for (let i = 0; i < n; i++) {
+      const S = PL.get(k0 + i);
+      if (!S || !HILL_B.includes(S.b) || S.buf || S.ev || S.busy && S.busy.kind !== 'crossing') return false;
+    }
+    return true;
+  }
+  /**
+   * F239m — Частина пагорба у відрізку g: поверхня, ліс на ній або церква / водонапірна башта на вершині,
+   * і всі дерева відрізка, що потрапили на пагорб, піднімаються на його схил.
+   * Параметри: g; c.
+   */
+  function hillPart(g, c) {
+    const ax = g.userData.ax;
+    if (hillZone && ax >= hillZone.ax1) hillZone = null;
+    if (!hillZone && (HILL_FORCE || hillOnce || ax > nextHillAbs && chance(.4))) {
+      const len = rr(160, 280);
+      const n = Math.ceil(len / CL);
+      if (hillOk(g, n)) {
+        const r = rnd();
+        hillZone = {
+          ax0: ax,
+          ax1: ax + n * CL,
+          cx: ax + n * CL / 2,
+          a: n * CL / 2,
+          cz: rr(-115, -145), // close enough to show through the usual fog (it hides everything past ~120-240 m)
+          b: rr(38, 50),
+          h: rr(18, 32),
+          ph: rr(0, 6.3),
+          top: HILL_FORCE || hillOnce || (r < .5 ? 'forest' : r < .75 ? 'church' : 'tower')
+        };
+        nextHillAbs = hillZone.ax1 + rr(1000, 3000);
+        hillOnce = null;
+        if (plK0 !== null) markAct(ax, 'hill', {
+          n
+        }); // icon on the route strip
+      } else nextHillAbs = ax + 200;
+    }
+    const H = hillZone;
+    if (!H || ax < H.ax0) return;
+    // surface
+    const z0 = H.cz + H.b * 1.12;
+    const z1 = H.cz - H.b * 1.12;
+    const nx = 20;
+    const nz = Math.ceil((z0 - z1) / 4);
+    const geo = new THREE.PlaneGeometry(CL, z0 - z1, nx, nz).rotateX(-Math.PI / 2).translate(CL / 2, 0, (z0 + z1) / 2);
+    const P = geo.attributes.position;
+    for (let i = 0; i < P.count; i++) P.setY(i, hillH(H, ax + P.getX(i), P.getZ(i)));
+    geo.computeVertexNormals();
+    const m = new THREE.Mesh(geo, MAT.ground[HILL_B.includes(g.userData.biome) ? g.userData.biome : 'field']);
+    m.userData.keep = 1;
+    g.add(m);
+    // what grows or stands on it
+    const peakHere = H.cx >= ax && H.cx < ax + CL;
+    const MX = {
+      con: .25,
+      bir: .3
+    };
+    if (H.top === 'forest') {
+      for (let i = 0; i < 70; i++) {
+        const x = rr(0, CL);
+        const z = rr(z1, z0);
+        if (hillH(H, ax + x, z) > 1) tree(c, x, z, rr(7, 14), MX);
+      }
+    } else {
+      for (let i = 0; i < 18; i++) {
+        const x = rr(0, CL);
+        const z = rr(z1, z0);
+        const hh = hillH(H, ax + x, z);
+        if (hh > 1 && hh < H.h * .55) tree(c, x, z, rr(6, 11), MX);
+      }
+      if (peakHere) {
+        const px = H.cx - ax;
+        const top = new THREE.Group();
+        top.userData.keep = 1; // already standing on the summit
+        top.position.y = H.h - .4 - .5;
+        g.add(top);
+        if (H.top === 'church') church(top, px, H.cz);else waterTower(top, px, H.cz, true);
+      }
+    }
+    // whatever this chunk already put where the hill rises (a water tower, a church, a hut) stands on the slope, not inside it
+    const lift = (o, depth) => {
+      for (const ch of o.children) {
+        if (ch === m || ch.userData.ground || ch.userData.keep && depth === 0) continue;
+        const p = ch.position;
+        if (p.x === 0 && p.z === 0 && ch.isGroup && depth < 2) {
+          lift(ch, depth + 1);
+          continue;
+        }
+        const hh = hillH(H, ax + p.x, p.z);
+        if (hh > 0) p.y += hh;
+      }
+    };
+    lift(g, 0);
+    // keep the top clear around the church / tower, lift every tree standing on the hill onto its slope
+    for (const k of ['tr', 'bt', 'bl', 'co', 'sp']) {
+      if (!c[k]) continue;
+      if (H.top !== 'forest') c[k] = c[k].filter(t => Math.hypot(ax + t[0] - H.cx, t[2] - H.cz) > 16);
+      for (const t of c[k]) {
+        const hh = hillH(H, ax + t[0], t[2]);
+        if (hh > 0) t[1] += hh;
+      }
+    }
+  }
   function industrial(g, c, MIX) {
     // the concrete fence is put up at the very end of the chunk (indFence), once everything it must avoid is in place
     indRailSlot(g, .6);
@@ -8524,7 +8654,9 @@
    */
   function vprofZ(V, d, z) {
     const [m, w] = vmean(V, z);
-    return vprof(V, d - m, w);
+    // the winding of the banks fades out towards both ends of the valley, so it meets the neighbouring chunks on a straight line
+    const e = ease(Math.max(0, Math.min(1, (60 - Math.abs(d)) / 18)));
+    return vprof(V, d - m * e, w * e);
   }
   /**
    * F317 — Повертає висоту поперечного профілю долини V; d — відстань від центру, dw — поправка ширини.
@@ -9520,8 +9652,8 @@
           forceStandTrain = pev.stand;
           stNamePlan = pev.name;
           if (pev.forced) forceShown = true;
-          if (chance(.25) && !clearDay) {
-            fogMulT = pick([.07, .09]);
+          if (chance(.06) && !clearDay) {
+            fogMulT = .45;
             fogMulTimer = 70;
           }
         } else {
@@ -9972,6 +10104,7 @@
       const ox = g.userData.ax - Z.ax0;
       for (const k of ['tr', 'bt', 'bl', 'co', 'sp']) if (c[k]) c[k] = c[k].filter(t => !awayHit(Z, ox + t[0], t[2], k === 'bl' || k === 'co' ? t[3] + 1 : k === 'sp' ? t[3] * .3 + 1 : 3));
     }
+    if (!g.userData.station) hillPart(g, c);
     if (g.userData.wtClear) for (const k of ['tr', 'bt', 'bl', 'co', 'sp']) if (c[k]) c[k] = c[k].filter(t => !g.userData.wtClear.some(w => Math.hypot(t[0] - w[0], t[2] - w[1]) < w[2]));
     if (c.sp.length) {
       if (g.userData.noTree) c.sp = c.sp.filter(
@@ -10185,7 +10318,7 @@
     let k = Math.min(d, V.n * 40 - d);
     if (V.split) k = Math.max(0, k - V.split.land);
     if (z !== undefined && z < -14) {
-      const r = ease(Math.min(1, (-z - 14) / 30));
+      const r = ease(Math.min(1, (-z - 14) / 30)) * ease(Math.max(0, Math.min(1, k / 40))); // no ragged bank where the valley meets its neighbours
       const f = d < V.n * 20 ? V.ph : V.ph + 2.7;
       k += r * (Math.sin(z * .021 + f) * 13 + Math.sin(z * .057 + f * 1.9) * 5.5 + Math.sin(z * .19 + f * .7) * 2 + Math.sin(z * .41 + f) * .9);
     }
@@ -12932,6 +13065,21 @@
         c.lineTo(5, -4);
         c.lineTo(8, -4);
         c.stroke();
+      } else if (k === 'hill') {
+        // a soft hump with two little trees on it
+        c.moveTo(-9, 5);
+        c.quadraticCurveTo(0, -9, 9, 5);
+        c.stroke();
+        c.beginPath();
+        c.moveTo(-2.5, -1);
+        c.lineTo(-2.5, -4.5);
+        c.moveTo(2, -1.5);
+        c.lineTo(2, -5);
+        c.stroke();
+        c.beginPath();
+        c.arc(-2.5, -5.2, 1.5, 0, 7);
+        c.arc(2, -5.7, 1.5, 0, 7);
+        c.fill();
       } else if (k === 'depot') {
         // the main line, a branch curving off it and a small shed with a gable
         c.moveTo(-9, 5);
@@ -13620,7 +13768,7 @@
     overcast: {
       c: 0x8b908c,
       n: 16,
-      f: 240,
+      f: 260,
       h: .95,
       s: .32,
       r: 0,
@@ -13630,7 +13778,7 @@
     fog: {
       c: 0xaaada6,
       n: 2,
-      f: 75,
+      f: 135,
       h: 1.05,
       s: .15,
       r: 0,
@@ -13640,7 +13788,7 @@
     rain: {
       c: 0x5c6467,
       n: 5,
-      f: 120,
+      f: 170,
       h: .6,
       s: .08,
       r: 1,
@@ -13650,7 +13798,7 @@
     drizzle: {
       c: 0x7a8282,
       n: 8,
-      f: 160,
+      f: 190,
       h: .75,
       s: .15,
       r: .35,
@@ -13660,7 +13808,7 @@
     dusk: {
       c: 0x7a675a,
       n: 12,
-      f: 200,
+      f: 220,
       h: .6,
       s: .35,
       r: 0,
@@ -13670,7 +13818,7 @@
     mist: {
       c: 0xb8b4a6,
       n: 6,
-      f: 110,
+      f: 160,
       h: 1.1,
       s: .4,
       r: 0,
@@ -13679,6 +13827,14 @@
     }
   };
   const WKEYS = Object.keys(WEATHER);
+  const WEATHER_W = {
+    overcast: 4,
+    dusk: 2,
+    drizzle: 3,
+    rain: 2,
+    mist: 2,
+    fog: 1
+  }; // how often each weather comes up: thick fog is the rarest
   const tCloud = (
   /**
    * F508 — Генерує текстуру шуму для процедурного неба.
@@ -13794,6 +13950,8 @@
     l: 0
   }];
   let fogMul = 1;
+  const FOG_MIN = 120; // the thickest fog still lets you see this far, m
+  let noFog = false; // test key NumPad 0
   let fogMulT = 1;
   let fogMulTimer = rr(15, 35);
   const NIGHT = new THREE.Color(0x141a24);
@@ -14450,7 +14608,7 @@
    * Параметри: e.
    */
   e => {
-    if (!TEST_TOOLS && /^Numpad(Subtract|Add|4|6|7|8|9)$/.test(e.code)) return;
+    if (!TEST_TOOLS && /^Numpad(Subtract|Add|0|4|5|6|7|8|9)$/.test(e.code)) return;
     if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Space'].includes(e.code)) e.preventDefault();
     if (e.code === 'KeyE' && !e.repeat) {
       toggleSeat();
@@ -14518,6 +14676,22 @@
         otherT = 0;
         toast('Тест: запускаю зустрічний потяг…');
       }
+      return;
+    }
+    if (e.code === 'Numpad5' && !e.repeat) {
+      if (hillZone || hillOnce) toast('Тест: пагорб уже попереду');else {
+        hillOnce = pick(['forest', 'church', 'tower']);
+        toast('Тест: пагорб (' + {
+          forest: 'ліс',
+          church: 'церква',
+          tower: 'водонапірна башта'
+        }[hillOnce] + ') — щойно буде поле, гай чи ліс');
+      }
+      return;
+    }
+    if (e.code === 'Numpad0' && !e.repeat) {
+      noFog = !noFog;
+      toast(noFog ? 'Тест: туман вимкнено' : 'Тест: туман увімкнено');
       return;
     }
     if (e.code === 'Numpad6' && !e.repeat) {
@@ -14675,7 +14849,7 @@
        * F553 — Відбирає наступну погоду, виключаючи поточну та несумісні з ясним днем варіанти.
        * Параметри: k.
        */
-      k => k !== weather && (!clearDay || k === 'overcast' || k === 'dusk')));
+      k => k !== weather && (!clearDay || k === 'overcast' || k === 'dusk')).flatMap(k => Array(WEATHER_W[k] || 1).fill(k)));
       weatherT = rr(28, 70);
     }
     speedT -= dt;
@@ -14698,8 +14872,8 @@
         forceIsland = false;
         stationBuild = stShift ? 5 : 3;
         biomeT = Math.max(biomeT, 45);
-        if (chance(.25) && !clearDay) {
-          fogMulT = pick([.07, .09]);
+        if (chance(.06) && !clearDay) {
+          fogMulT = .45;
           fogMulTimer = 70;
         }
       }
@@ -14900,7 +15074,7 @@
     for (const p of ['h', 's', 'r', 'd', 'e']) cur[p] += (W[p] - cur[p]) * k;
     fogMulTimer -= dt;
     if (fogMulTimer <= 0) {
-      fogMulT = clearDay ? pick([1, 1.3, 1.6]) : pick([.07, .1, .4, .6, .8, 1, 1, 1, 1.3, 1.6]);
+      fogMulT = clearDay ? pick([1, 1.3, 1.6]) : chance(.05) ? .45 : pick([.9, 1, 1, 1, 1.15, 1.3, 1.6]); // a thick spell is rare
       fogMulTimer = rr(15, 40);
     }
     fogMul += (fogMulT - fogMul) * dt * .06;
@@ -14966,10 +15140,16 @@
     clear += (clearOn - clear) * dt * .05;
     const fm = fogMul + clear * Math.max(0, 360 / cur.f - fogMul);
     scene.fog.near = cur.n * fm;
-    scene.fog.far = Math.min(380, Math.max(cur.n * fm + 8, cur.f * fm * (1 - nf * .35 * NIGHTK[SET.bright] * (1 - clear))));
+    scene.fog.far = Math.min(380, Math.max(FOG_MIN, cur.n * fm + 8, cur.f * fm * (1 - nf * .15 * NIGHTK[SET.bright] * (1 - clear))));
+    scene.fog.near = Math.min(scene.fog.near, scene.fog.far * .4);
     if (tun > 0) {
       scene.fog.near += (180 - scene.fog.near) * tun;
       scene.fog.far += (420 - scene.fog.far) * tun;
+    }
+    if (noFog) {
+      // test key NumPad 0: no fog, the whole built world (about 400 m ahead) is visible
+      scene.fog.near = 2000;
+      scene.fog.far = 2500;
     }
     {
       const u = SKY.material.uniforms;
